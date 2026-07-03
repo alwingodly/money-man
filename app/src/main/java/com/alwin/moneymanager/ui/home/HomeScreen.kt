@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -67,6 +68,7 @@ fun HomeScreen(
     onViewAllEmisClick: () -> Unit,
     onViewAllExpensesClick: () -> Unit,
     onEmiClick: (Long) -> Unit,
+    onExpenseDateClick: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     sectionsViewModel: HomeSectionsViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel(),
@@ -168,7 +170,7 @@ fun HomeScreen(
             if (showRecentActivity && recentActivity.isNotEmpty()) {
                 HomeBlock(title = "Recent activity", onViewAllClick = onViewAllExpensesClick) {
                     recentActivity.forEachIndexed { index, item ->
-                        ActivityRow(item = item)
+                        ActivityRow(item = item, onClick = { onExpenseDateClick(item.expense.dateMillis) })
                         if (index != recentActivity.lastIndex) HorizontalDivider()
                     }
                 }
@@ -312,31 +314,53 @@ private fun EmiPreviewRow(item: EmiWithProgress, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ActivityRow(item: RecentExpenseItem) {
+private fun ActivityRow(item: RecentExpenseItem, onClick: () -> Unit) {
+    val color = categoryColor(item.expense.categoryId)
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(8.dp).background(categoryColor(item.expense.categoryId), CircleShape),
-        )
-        Text(
-            item.categoryName,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 10.dp).weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            relativeDayLabel(item.expense.dateMillis),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 10.dp),
-        )
+            modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                item.categoryName.take(1).uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = color,
+            )
+        }
+        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    item.categoryName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (item.expense.isCreditCard) {
+                    Icon(
+                        Icons.Filled.CreditCard,
+                        contentDescription = "Paid by credit card",
+                        modifier = Modifier.padding(start = 6.dp).size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Text(
+                relativeDayLabel(item.expense.dateMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
         Text(
             formatCurrency(item.expense.amount),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 8.dp),
         )
     }
 }

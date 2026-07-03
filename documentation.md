@@ -73,11 +73,16 @@ being asked; currency is now fixed to Rupee. Everything else is planned but not 
      as the EMI quick-stat tiles
      — hiding EMI info hides this preview too, on the assumption that's what "hide EMI" means
    - **Recent activity**: last 5 expenses across every category (`HomeRepository.getRecentActivity`,
-     `ExpenseDao.getRecentExpenses` ordered `dateMillis DESC, id DESC`), each row a category color
-     dot (`ui/expense/CategoryColor.kt#categoryColor`, same as the day-detail page) + category name
-     + a relative day label ("Today"/"Yesterday"/`d MMM`) + amount. "View all" navigates to the
-     Expenses tab. This is a genuinely new section (not a re-skin of an old one) so it got its own
-     `HomeSection.RECENT_ACTIVITY` toggle entry rather than being unconditionally shown
+     `ExpenseDao.getRecentExpenses` ordered `dateMillis DESC, id DESC`). Each row is a 40dp circular
+     avatar — category color at 15% alpha as the fill, the category name's first letter (bold, full
+     category color) as the "glyph" — next to a two-line label (category name + credit-card icon
+     inline if `isCreditCard`, then a relative day label below) and the amount on the right. This
+     replaced an 8dp color dot + single cramped line of name/date/amount, which read as "boring."
+     Tapping a row navigates to that expense's day-detail page (`onExpenseDateClick`,
+     reuses the existing `expense_day/{dateMillis}` route — no new screen needed) rather than being
+     purely decorative; "View all" still navigates to the Expenses tab. This is a genuinely new
+     section (not a re-skin of an old one) so it got its own `HomeSection.RECENT_ACTIVITY` toggle
+     entry rather than being unconditionally shown
    - The hero number and quick-stat tiles are still grouped by the same four concepts as before
      (This Month, Payment Method, EMI, Monthly Average) and each group is still individually
      hideable via the existing `HomeSection` toggles — `HeroCard` only shows when `THIS_MONTH` is

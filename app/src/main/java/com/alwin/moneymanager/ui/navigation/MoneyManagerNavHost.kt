@@ -85,6 +85,9 @@ fun MoneyManagerNavHost() {
                     onEmiClick = { emiId ->
                         navController.navigate(Destination.EmiDetail.createRoute(emiId))
                     },
+                    onExpenseDateClick = { dateMillis ->
+                        navController.navigate(Destination.ExpenseDayDetail.createRoute(dateMillis))
+                    },
                 )
             }
             composable(Destination.EmiList.route) {
