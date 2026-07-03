@@ -7,6 +7,7 @@ import com.alwin.moneymanager.data.local.MIGRATION_2_3
 import com.alwin.moneymanager.data.local.MIGRATION_3_4
 import com.alwin.moneymanager.data.local.MIGRATION_4_5
 import com.alwin.moneymanager.data.local.MIGRATION_5_6
+import com.alwin.moneymanager.data.local.MIGRATION_6_7
 import com.alwin.moneymanager.data.local.MoneyManagerDatabase
 import com.alwin.moneymanager.data.local.dao.EmiDao
 import com.alwin.moneymanager.data.local.dao.ExpenseCategoryDao
@@ -30,7 +31,7 @@ object DatabaseModule {
             MoneyManagerDatabase::class.java,
             MoneyManagerDatabase.DATABASE_NAME,
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
 
     @Provides

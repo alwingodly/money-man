@@ -25,6 +25,7 @@ import com.alwin.moneymanager.ui.emi.EmiDetailScreen
 import com.alwin.moneymanager.ui.emi.EmiListScreen
 import com.alwin.moneymanager.ui.expense.DayDetailScreen
 import com.alwin.moneymanager.ui.expense.ExpenseScreen
+import com.alwin.moneymanager.ui.expense.ExpenseSearchScreen
 import com.alwin.moneymanager.ui.home.HomeScreen
 import com.alwin.moneymanager.ui.profile.ProfileScreen
 import com.alwin.moneymanager.ui.settings.SettingsScreen
@@ -122,6 +123,15 @@ fun MoneyManagerNavHost() {
             composable(Destination.Expenses.route) {
                 ExpenseScreen(
                     onDateSelected = { dateMillis ->
+                        navController.navigate(Destination.ExpenseDayDetail.createRoute(dateMillis))
+                    },
+                    onSearchClick = { navController.navigate(Destination.ExpenseSearch.route) },
+                )
+            }
+            composable(Destination.ExpenseSearch.route) {
+                ExpenseSearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onExpenseClick = { dateMillis ->
                         navController.navigate(Destination.ExpenseDayDetail.createRoute(dateMillis))
                     },
                 )

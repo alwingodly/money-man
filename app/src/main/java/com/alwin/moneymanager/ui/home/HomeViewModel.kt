@@ -9,6 +9,7 @@ import com.alwin.moneymanager.data.repository.RecentExpenseItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -39,4 +40,11 @@ class HomeViewModel @Inject constructor(
 
     val recentActivity: StateFlow<List<RecentExpenseItem>> = repository.getRecentActivity(RECENT_ACTIVITY_LIMIT)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // True until the dashboard's first data arrives, so Home shows a spinner instead of briefly
+    // flashing the "Welcome" empty state (which looks identical to a genuinely empty account) to
+    // a returning user while Room loads.
+    val isLoading: StateFlow<Boolean> = repository.getHomeSummary()
+        .map { false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 }

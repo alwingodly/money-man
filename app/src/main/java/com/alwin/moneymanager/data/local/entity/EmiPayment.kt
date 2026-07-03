@@ -17,7 +17,12 @@ import kotlinx.serialization.Serializable
             onDelete = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index("emiId")],
+    indices = [
+        Index("emiId"),
+        // One payment per (loan, installment number). Backs the DB-level guard against a rapid
+        // double-tap on "mark paid" inserting the same monthNumber twice and double-counting.
+        Index(value = ["emiId", "monthNumber"], unique = true),
+    ],
 )
 data class EmiPayment(
     @PrimaryKey(autoGenerate = true)

@@ -12,7 +12,7 @@ import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 
 @Database(
     entities = [Emi::class, EmiPayment::class, Expense::class, ExpenseCategory::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class MoneyManagerDatabase : RoomDatabase() {

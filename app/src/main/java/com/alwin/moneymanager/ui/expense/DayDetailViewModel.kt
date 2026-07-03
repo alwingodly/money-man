@@ -35,11 +35,15 @@ class DayDetailViewModel @Inject constructor(
     val categories: StateFlow<List<ExpenseCategory>> = repository.getAllCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun updateExpense(expense: Expense, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
-        viewModelScope.launch { repository.updateExpense(expense, amount, note, dateMillis, isCreditCard) }
+    fun updateExpense(expense: Expense, categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
+        viewModelScope.launch { repository.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard) }
     }
 
     fun deleteExpense(expense: Expense) {
         viewModelScope.launch { repository.deleteExpense(expense) }
+    }
+
+    fun restoreExpense(expense: Expense) {
+        viewModelScope.launch { repository.restoreExpense(expense) }
     }
 }

@@ -166,13 +166,16 @@ class EmiRepository @Inject constructor(
     /** Returns true if this payment was the final installment, completing the loan. */
     suspend fun markNextMonthPaid(emi: Emi, paidMonths: Int): Boolean {
         val nextMonth = paidMonths + 1
-        emiDao.insertPayment(
+        val insertedId = emiDao.insertPayment(
             EmiPayment(
                 emiId = emi.id,
                 monthNumber = nextMonth,
                 paidDateMillis = System.currentTimeMillis(),
             )
         )
+        // -1 means this installment was already recorded (duplicate ignored) — don't re-run the
+        // completion/reminder side effects off a payment that didn't actually happen.
+        if (insertedId == -1L) return false
         val justCompleted = nextMonth >= emi.totalMonths
         val updatedEmi = if (justCompleted) {
             emi.copy(isCompleted = true).also { emiDao.updateEmi(it) }

@@ -15,6 +15,7 @@ sealed class Destination(val route: String) {
     }
     data object EmiClosedList : Destination("emi_closed_list")
     data object Expenses : Destination("expenses")
+    data object ExpenseSearch : Destination("expense_search")
     data object ExpenseDayDetail : Destination("expense_day/{dateMillis}") {
         const val ARG_DATE_MILLIS = "dateMillis"
         fun createRoute(dateMillis: Long) = "expense_day/$dateMillis"

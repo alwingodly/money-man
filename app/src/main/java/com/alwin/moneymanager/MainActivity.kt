@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,8 +15,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.ui.applock.AppLockGate
 import com.alwin.moneymanager.ui.navigation.MoneyManagerNavHost
+import com.alwin.moneymanager.ui.onboarding.OnboardingScreen
+import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
+import com.alwin.moneymanager.ui.settings.CurrencyViewModel
 import com.alwin.moneymanager.ui.theme.MoneyManagerTheme
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
+import com.alwin.moneymanager.util.currentCurrency
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -26,14 +31,28 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Financial data on screen: block screenshots/screen recording and hide the app's
+        // content in the recent-apps switcher thumbnail.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE,
+        )
         enableEdgeToEdge()
         requestNotificationPermissionIfNeeded()
         setContent {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val themeColor by themeViewModel.themeColor.collectAsState()
+            val currencyViewModel: CurrencyViewModel = hiltViewModel()
+            currentCurrency = currencyViewModel.currency.collectAsState().value
             MoneyManagerTheme(seedColor = themeColor.seed) {
-                AppLockGate {
-                    MoneyManagerNavHost()
+                val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+                val hasSeenOnboarding by onboardingViewModel.hasSeenOnboarding.collectAsState()
+                if (hasSeenOnboarding) {
+                    AppLockGate {
+                        MoneyManagerNavHost()
+                    }
+                } else {
+                    OnboardingScreen(onFinish = onboardingViewModel::markSeen)
                 }
             }
         }

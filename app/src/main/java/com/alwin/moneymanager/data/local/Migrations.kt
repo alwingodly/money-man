@@ -77,3 +77,23 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_expense_dateMillis` ON `expense` (`dateMillis`)")
     }
 }
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Enforce one payment per (loan, installment). A rapid double-tap on "mark paid" could
+        // previously insert the same monthNumber twice and double-count. First drop any existing
+        // duplicates (keep the earliest row per group), since a UNIQUE index can't be created
+        // over a table that already violates it — then add the index Room now expects.
+        db.execSQL(
+            """
+            DELETE FROM emi_payment
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM emi_payment GROUP BY emiId, monthNumber
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_emi_payment_emiId_monthNumber` ON `emi_payment` (`emiId`, `monthNumber`)"
+        )
+    }
+}

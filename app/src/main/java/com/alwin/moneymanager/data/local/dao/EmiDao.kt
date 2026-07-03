@@ -3,6 +3,7 @@ package com.alwin.moneymanager.data.local.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.alwin.moneymanager.data.local.entity.Emi
@@ -36,8 +37,13 @@ interface EmiDao {
     @Query("SELECT COUNT(*) FROM emi_payment WHERE emiId = :emiId")
     suspend fun getPaidMonthCount(emiId: Long): Int
 
-    @Insert
-    suspend fun insertPayment(payment: EmiPayment)
+    /**
+     * IGNORE so a duplicate (emiId, monthNumber) — e.g. from a rapid double-tap on "mark paid"
+     * where the second call still sees stale paidMonths — silently no-ops against the unique
+     * index instead of crashing. Returns the new rowId, or -1 when the insert was ignored.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPayment(payment: EmiPayment): Long
 
     @Query("SELECT * FROM emi_payment WHERE emiId = :emiId ORDER BY monthNumber DESC LIMIT 1")
     suspend fun getLastPayment(emiId: Long): EmiPayment?

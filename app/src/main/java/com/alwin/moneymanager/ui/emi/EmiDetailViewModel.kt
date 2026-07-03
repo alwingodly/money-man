@@ -24,12 +24,24 @@ class EmiDetailViewModel @Inject constructor(
     val emiWithProgress: StateFlow<EmiWithProgress?> = repository.getEmiWithProgress(emiId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    // Blocks a second "mark paid" from launching while the first is still writing — the StateFlow
+    // hasn't re-emitted the new paidMonths yet, so without this both taps would compute the same
+    // next installment. The DB unique index is the ultimate backstop; this just avoids the wasted
+    // round-trip and any UI flicker.
+    private var isMarkingPaid = false
+
     fun markNextMonthPaid(onCompleted: () -> Unit) {
         val current = emiWithProgress.value ?: return
         if (current.paidMonths >= current.emi.totalMonths) return
+        if (isMarkingPaid) return
+        isMarkingPaid = true
         viewModelScope.launch {
-            val justCompleted = repository.markNextMonthPaid(current.emi, current.paidMonths)
-            if (justCompleted) onCompleted()
+            try {
+                val justCompleted = repository.markNextMonthPaid(current.emi, current.paidMonths)
+                if (justCompleted) onCompleted()
+            } finally {
+                isMarkingPaid = false
+            }
         }
     }
 

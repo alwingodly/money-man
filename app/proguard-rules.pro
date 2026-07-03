@@ -12,10 +12,22 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep readable crash stack traces while still obfuscating class names.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ---- kotlinx.serialization ----
+# Room/Hilt/Compose ship their own consumer ProGuard rules, but kotlinx.serialization
+# relies on generated $$serializer classes that R8 would otherwise strip/rename, which
+# would break the JSON backup/restore feature at runtime.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+
+# Keep the generated serializers and the Companion.serializer() lookups for our @Serializable models.
+-keepclassmembers class com.alwin.moneymanager.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.alwin.moneymanager.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.alwin.moneymanager.**$$serializer { *; }

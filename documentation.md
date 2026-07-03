@@ -8,13 +8,18 @@ starting a new module.
 
 - **UI:** Jetpack Compose, Material 3
 - **Architecture:** MVVM (ViewModel + StateFlow, Room DAOs expose Flow)
-- **DB:** Room (current schema version: 6)
+- **DB:** Room (current schema version: 7)
 - **Preferences:** DataStore (Preferences) — used for App Lock settings, Home section
   visibility, theme color, and profile (name/photo path)
 - **Serialization:** `kotlinx.serialization` (JSON) — used only for the Local Backup/Restore
   export format; entities are annotated `@Serializable` directly, no separate DTO layer
-- **Currency:** fixed to Rupee (₹) app-wide, no user-facing switcher — see `util/AppCurrency.kt`
-  (`formatCurrency()`). There used to be a Rupee/Dollar/Dinar picker; it was deliberately removed
+- **Currency:** Rupee/Dollar/Dinar, user-selectable from Settings (symbol only — see
+  `util/AppCurrency.kt`'s `CurrencyType`/`formatCurrency()`/`currentCurrency`, and
+  `data/repository/CurrencyRepository.kt` for the DataStore-backed choice). No conversion between
+  currencies is performed; switching just changes which symbol `formatCurrency()` prints
+  app-wide. This picker was built once, deliberately removed, then explicitly re-requested and
+  rebuilt on 2026-07-03 — if asked to remove it again, confirm first rather than assuming the
+  earlier removal still stands
 - **DI:** Hilt (including field injection into `BroadcastReceiver`s via `@AndroidEntryPoint`)
 - **Navigation:** Navigation Compose
 - **Biometrics:** `androidx.biometric` — requires `MainActivity` to be a `FragmentActivity`, not
@@ -33,9 +38,10 @@ reminders, loan amount/interest tracking, closed-loan archive, payoff celebratio
 that opens a full day-detail page, editable after the fact), a Profile screen (name + photo),
 a curated theme-color picker (shadcn/ui-style neutral surfaces + one accent color, applied
 app-wide), Local Backup/Restore (export/import a full JSON snapshot via Android's file picker),
-and App Lock (biometric/PIN). See "Done" section below. Bank Balance and Currency selection
-(Rupee/Dollar/Dinar toggle) were both built and then removed — do not re-add either without
-being asked; currency is now fixed to Rupee. Everything else is planned but not yet built.
+App Lock (biometric/PIN), a Rupee/Dollar/Dinar currency picker (symbol-only, no conversion), and
+a one-time swipeable onboarding tutorial (Home/EMI/Expenses/Settings, replayable from Settings →
+Help). See "Done" section below. Bank Balance was built and then removed — do not re-add it
+without being asked. Everything else is planned but not yet built.
 
 ---
 
@@ -388,6 +394,18 @@ being asked; currency is now fixed to Rupee. Everything else is planned but not 
      should be exported, so a parallel set of "export model" classes would be pure duplication
    - **Build this before WhatsApp export** — the WhatsApp feature reuses this exact
      `MoneyManagerExport` format, just swaps the destination `Intent`
+   - **Backup nudge:** a dismissible tertiary-container card at the top of Home reminds the user
+     to export when it's been 30+ days since their last backup (`BackupReminderRepository` tracks
+     `last_backup_millis`/`nudge_dismissed_millis`/`first_use_millis` in DataStore; the clock runs
+     from the most recent of those so new users aren't nagged on day one). `BackupRepository.exportTo`
+     calls `recordBackup()` on success; the card only shows when there's actual data to protect
+     (Home has active EMIs or recent activity). "Back up now" routes to Settings, the X snoozes
+
+8. **Expense Search** (`ui/expense/ExpenseSearchScreen.kt`, reached via the search icon in the
+   Expenses top bar → `Destination.ExpenseSearch`). Debounced free-text search over note text,
+   category name, and exact amount prefix (`ExpenseDao.searchExpenses`, a `LEFT JOIN` to
+   `expense_category`); tapping a result opens that expense's day-detail page. Read-only listing —
+   no edit/delete here, keeping it a pure "find it" surface
 
 ### 🔲 To Build
 
@@ -417,6 +435,24 @@ being asked; currency is now fixed to Rupee. Everything else is planned but not 
     - Shows: next EMI due (name, amount, due date)
     - Refresh via `WorkManager` periodic worker (simplest) or a `ContentObserver`/`Flow` bridge for live updates
     - Depends on EMI module data only
+
+13. **Personal Debt Ledger ("who owes whom")** — *low priority, requested 2026-07-03*
+    - Informal person-to-person debts (money lent to / borrowed from friends & family), distinct
+      from the formal `Emi` module. Use case in the user's words: "1000 rs debt to my friend, told
+      them I'll give 1000 next month (notify); sometimes I give 500 only, so minus 500… so we don't
+      forget it."
+    - Each debt has: a person/name, a direction (I owe them **vs** they owe me), an original amount,
+      an optional due date, and a **running outstanding balance** that starts at the original amount
+    - **Partial payments** reduce the outstanding balance (₹1000 → pay ₹500 → ₹500 remaining), tracked
+      as a list of payment entries per debt (mirror the `Emi`/`EmiPayment` parent-child shape so the
+      "sum of payments vs total" logic and undo patterns can be reused). Auto-mark settled when the
+      balance hits 0
+    - **Due-date reminder** via the existing `AlarmManager` + `NotificationHelper` path — reuse
+      `EmiReminderScheduler`'s inexact-alarm pattern rather than adding a new scheduler
+    - New Room entities (`Debt`, `DebtPayment`) → **new migration + version bump**, and include them in
+      the Backup/Restore `MoneyManagerExport` snapshot (add `@Serializable`, extend import/export +
+      the `sqlite_sequence` resync). A Home summary line ("You are owed ₹X / You owe ₹Y") is optional
+      follow-up, gated behind its own `HomeSection` toggle
 
 ---
 
@@ -531,10 +567,16 @@ Profile                          // needed for WhatsApp import / multi-person vi
   registered there shipped once already and crashed on launch for anyone upgrading from an older
   schema version with `IllegalStateException: A migration from N to N+1 was required but not
   found`. Also remember to bump `@Database(version = ...)` in `MoneyManagerDatabase.kt` itself.
-- **Currency formatting is fixed to Rupee, not per-record or user-selectable.** Use
-  `formatCurrency()` from `util/AppCurrency.kt` everywhere amounts are displayed — don't use
-  `NumberFormat.getCurrencyInstance()` (follows device locale) and don't reintroduce a
-  currency-selection ViewModel/repository/DataStore key; that was tried and explicitly removed.
+- **Currency is user-selectable (Rupee/Dollar/Dinar) but symbol-only, not per-record.** Always
+  use `formatCurrency()` from `util/AppCurrency.kt` everywhere amounts are displayed — never
+  `NumberFormat.getCurrencyInstance()` (follows device locale instead of the user's in-app
+  choice). The current choice lives in a plain top-level `currentCurrency` (a `mutableStateOf`
+  in `AppCurrency.kt`, not a `CompositionLocal`), synced once at the root composable in
+  `MainActivity` from `CurrencyViewModel`/`CurrencyRepository`'s DataStore-backed value — this
+  lets every existing `formatCurrency()` call site (including plain non-`@Composable` helpers)
+  react to a change without threading the value through as a parameter everywhere. Don't add
+  per-record currency or conversion logic without being asked; that's a much bigger change
+  (new DB column, rethinking how EMI/expense totals aggregate across currencies).
 - **Side-effecting platform calls (alarms) live in the repository, next to the DB write they
   accompany**, not in ViewModels — see `EmiRepository.markNextMonthPaid`/`undoLastPayment`
   calling `EmiReminderScheduler` right after the DB mutation. This keeps "what triggers a

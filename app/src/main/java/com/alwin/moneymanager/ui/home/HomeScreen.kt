@@ -21,9 +21,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -47,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.EmiWithProgress
 import com.alwin.moneymanager.data.repository.HomeSection
 import com.alwin.moneymanager.data.repository.RecentExpenseItem
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.emi.EmiProgressRing
 import com.alwin.moneymanager.ui.expense.categoryColor
 import com.alwin.moneymanager.ui.profile.ProfileAvatar
@@ -72,10 +78,13 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     sectionsViewModel: HomeSectionsViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel(),
+    backupReminderViewModel: BackupReminderViewModel = hiltViewModel(),
 ) {
     val summary by viewModel.summary.collectAsState()
     val activeEmis by viewModel.activeEmis.collectAsState()
     val recentActivity by viewModel.recentActivity.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val shouldNudgeBackup by backupReminderViewModel.shouldNudge.collectAsState()
     val showThisMonth by sectionsViewModel.visibility.getValue(HomeSection.THIS_MONTH).collectAsState()
     val showPaymentMethod by sectionsViewModel.visibility.getValue(HomeSection.PAYMENT_METHOD).collectAsState()
     val showEmi by sectionsViewModel.visibility.getValue(HomeSection.EMI).collectAsState()
@@ -116,6 +125,14 @@ fun HomeScreen(
             )
         }
     ) { innerPadding ->
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -123,6 +140,15 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
+            val hasData = activeEmis.isNotEmpty() || recentActivity.isNotEmpty()
+            if (shouldNudgeBackup && hasData) {
+                BackupNudgeCard(
+                    onBackUpClick = onSettingsClick,
+                    onDismiss = backupReminderViewModel::snooze,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+            }
+
             if (showThisMonth) {
                 HeroCard(
                     label = "This month, incl. EMI",
@@ -175,6 +201,67 @@ fun HomeScreen(
                     }
                 }
             }
+
+            if (activeEmis.isEmpty() && recentActivity.isEmpty()) {
+                EmptyState(
+                    icon = Icons.Filled.Receipt,
+                    title = "Welcome to Money Manager",
+                    subtitle = "Add your first expense or loan from the tabs below to see it show up here.",
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun BackupNudgeCard(
+    onBackUpClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.CloudUpload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Time to back up",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                // Default 48dp IconButton keeps the touch target accessible; the glyph itself is
+                // shrunk so it still reads as a small dismiss affordance in the compact card.
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Dismiss backup reminder",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Text(
+                "You haven't saved a backup in a while. Export one so you don't lose your data if you change phones.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            TextButton(
+                onClick = onBackUpClick,
+                modifier = Modifier.align(Alignment.End).padding(top = 4.dp),
+            ) { Text("Back up now") }
         }
     }
 }
