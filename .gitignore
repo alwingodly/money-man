@@ -1,0 +1,25 @@
+*.iml
+.gradle/
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# IDE — machine/user-specific, not shared
+.idea/
+
+# OS
+.DS_Store
+
+# Signing — never commit real keys/passwords
+*.jks
+*.keystore
+key.properties
+
+# Build artifacts (normally under build/, but just in case)
+*.apk
+*.aab
+
+# Profiler snapshots
+*.hprof

@@ -1,0 +1,51 @@
+package com.alwin.moneymanager.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+import com.alwin.moneymanager.data.local.entity.Expense
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ExpenseDao {
+
+    @Query("SELECT * FROM expense WHERE categoryId = :categoryId ORDER BY dateMillis DESC")
+    fun getExpensesByCategory(categoryId: Long): Flow<List<Expense>>
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM expense WHERE dateMillis >= :startMillis AND dateMillis < :endMillis")
+    fun getExpenseTotalForPeriod(startMillis: Long, endMillis: Long): Flow<Double>
+
+    @Query("SELECT * FROM expense WHERE dateMillis >= :startMillis AND dateMillis < :endMillis ORDER BY dateMillis DESC")
+    fun getExpensesForPeriod(startMillis: Long, endMillis: Long): Flow<List<Expense>>
+
+    /** Most recently logged expenses, across every category — used for Home's activity preview. */
+    @Query("SELECT * FROM expense ORDER BY dateMillis DESC, id DESC LIMIT :limit")
+    fun getRecentExpenses(limit: Int): Flow<List<Expense>>
+
+    @Query(
+        "SELECT COALESCE(SUM(amount), 0) FROM expense " +
+            "WHERE dateMillis >= :startMillis AND dateMillis < :endMillis AND isCreditCard = :isCreditCard"
+    )
+    fun getExpenseTotalForPeriodByPaymentMethod(
+        startMillis: Long,
+        endMillis: Long,
+        isCreditCard: Boolean,
+    ): Flow<Double>
+
+    @Insert
+    suspend fun insertExpense(expense: Expense)
+
+    @Update
+    suspend fun updateExpense(expense: Expense)
+
+    @Delete
+    suspend fun deleteExpense(expense: Expense)
+
+    @Query("SELECT * FROM expense")
+    suspend fun getAllExpensesSnapshot(): List<Expense>
+
+    @Insert
+    suspend fun insertExpenses(expenses: List<Expense>)
+}

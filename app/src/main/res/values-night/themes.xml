@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme: content is themed via Compose MaterialTheme; this only
+         controls the window background before Compose takes over. -->
+    <style name="Theme.Moneyman" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/purple_700</item>
+    </style>
+</resources>
