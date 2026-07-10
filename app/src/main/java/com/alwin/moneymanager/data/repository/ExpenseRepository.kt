@@ -30,6 +30,10 @@ class ExpenseRepository @Inject constructor(
 
     fun getRecentExpenses(limit: Int): Flow<List<Expense>> = expenseDao.getRecentExpenses(limit)
 
+    fun getAllExpenses(): Flow<List<Expense>> = expenseDao.getAllExpenses()
+
+    fun searchExpenses(query: String): Flow<List<Expense>> = expenseDao.searchExpenses(query.trim())
+
     fun getExpenseTotalForPeriodByPaymentMethod(
         startMillis: Long,
         endMillis: Long,
@@ -56,15 +60,25 @@ class ExpenseRepository @Inject constructor(
 
     suspend fun updateExpense(
         expense: Expense,
+        categoryId: Long,
         amount: Double,
         note: String,
         dateMillis: Long,
         isCreditCard: Boolean,
     ) {
         expenseDao.updateExpense(
-            expense.copy(amount = amount, note = note, dateMillis = dateMillis, isCreditCard = isCreditCard)
+            expense.copy(
+                categoryId = categoryId,
+                amount = amount,
+                note = note,
+                dateMillis = dateMillis,
+                isCreditCard = isCreditCard,
+            )
         )
     }
 
     suspend fun deleteExpense(expense: Expense) = expenseDao.deleteExpense(expense)
+
+    /** Re-inserts a just-deleted expense with its original id preserved (for Snackbar undo). */
+    suspend fun restoreExpense(expense: Expense) = expenseDao.insertExpense(expense)
 }

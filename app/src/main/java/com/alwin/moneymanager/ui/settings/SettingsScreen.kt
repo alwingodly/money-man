@@ -26,7 +26,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
@@ -62,8 +64,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.HomeSection
 import com.alwin.moneymanager.ui.applock.AppLockViewModel
 import com.alwin.moneymanager.ui.home.HomeSectionsViewModel
+import com.alwin.moneymanager.ui.navigation.NavTabsViewModel
+import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
 import com.alwin.moneymanager.ui.theme.AppThemeColor
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
+import com.alwin.moneymanager.util.CurrencyType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,8 +79,13 @@ fun SettingsScreen(
     appLockViewModel: AppLockViewModel = hiltViewModel(),
     homeSectionsViewModel: HomeSectionsViewModel = hiltViewModel(),
     themeViewModel: ThemeViewModel = hiltViewModel(),
+    currencyViewModel: CurrencyViewModel = hiltViewModel(),
     backupViewModel: BackupViewModel = hiltViewModel(),
+    onboardingViewModel: OnboardingViewModel = hiltViewModel(),
+    navTabsViewModel: NavTabsViewModel = hiltViewModel(),
 ) {
+    val showDebtsTab by navTabsViewModel.showDebts.collectAsState()
+    val showSavingsTab by navTabsViewModel.showSavings.collectAsState()
     val isAppLockEnabled by appLockViewModel.isAppLockEnabled.collectAsState()
     val lockOnBackground by appLockViewModel.lockOnBackground.collectAsState()
     val isBackupWorking by backupViewModel.isWorking.collectAsState()
@@ -148,6 +158,32 @@ fun SettingsScreen(
                 ThemeColorPicker(themeViewModel)
             }
 
+            SettingsSection(title = "Currency", icon = Icons.Filled.CurrencyExchange) {
+                Text(
+                    "Only changes the symbol shown — amounts aren't converted.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                CurrencyPicker(currencyViewModel)
+            }
+
+            SettingsSection(title = "Bottom tabs", icon = Icons.Filled.Dashboard) {
+                SettingRow(
+                    title = "Debts tab",
+                    subtitle = "Show the Debts tab in the bottom bar",
+                    checked = showDebtsTab,
+                    onCheckedChange = { navTabsViewModel.setShowDebts(it) },
+                )
+                SettingDivider()
+                SettingRow(
+                    title = "Savings tab",
+                    subtitle = "Show the Savings tab in the bottom bar",
+                    checked = showSavingsTab,
+                    onCheckedChange = { navTabsViewModel.setShowSavings(it) },
+                )
+            }
+
             SettingsSection(title = "Customize Home", icon = Icons.Filled.Dashboard) {
                 HomeSection.entries.forEachIndexed { index, section ->
                     val visible by homeSectionsViewModel.visibility.getValue(section).collectAsState()
@@ -189,6 +225,18 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            SettingsSection(title = "Help", icon = Icons.Filled.Help) {
+                ActionRow(
+                    title = "Replay tutorial",
+                    subtitle = "See the welcome walkthrough again",
+                    buttonLabel = "Replay",
+                    enabled = true,
+                    onClick = onboardingViewModel::resetOnboarding,
+                )
+            }
+
+            AppVersionFooter(modifier = Modifier.padding(top = 8.dp))
         }
     }
 
@@ -266,6 +314,35 @@ private fun ThemeColorPicker(themeViewModel: ThemeViewModel) {
                 onClick = { themeViewModel.setThemeColor(color) },
             )
         }
+    }
+}
+
+@Composable
+private fun CurrencyPicker(currencyViewModel: CurrencyViewModel) {
+    val selected by currencyViewModel.currency.collectAsState()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CurrencyType.entries.forEach { type ->
+            CurrencyChip(
+                type = type,
+                isSelected = type == selected,
+                onClick = { currencyViewModel.setCurrency(type) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CurrencyChip(type: CurrencyType, isSelected: Boolean, onClick: () -> Unit) {
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .background(backgroundColor, MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${type.symbol}  ${type.label}", color = contentColor, style = MaterialTheme.typography.labelLarge)
     }
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.EmiWithProgress
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.util.formatCurrency
 
 @Composable
@@ -45,8 +47,10 @@ fun EmiListScreen(
 ) {
     val emiList by viewModel.emiList.collectAsState()
     val monthSummary by viewModel.monthSummary.collectAsState()
+    val periodTotals by viewModel.periodTotals.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var showTotals by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -71,6 +75,13 @@ fun EmiListScreen(
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
+                                text = { Text("Monthly & yearly totals") },
+                                onClick = {
+                                    menuExpanded = false
+                                    showTotals = true
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Closed loans") },
                                 onClick = {
                                     menuExpanded = false
@@ -89,12 +100,12 @@ fun EmiListScreen(
         },
     ) { innerPadding ->
         if (emiList.isEmpty()) {
-            Box(
+            EmptyState(
+                icon = Icons.Filled.CreditCard,
+                title = "No loans yet",
+                subtitle = "Tap + below to add a loan or EMI — we'll track your payments and due dates for you.",
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("No EMIs yet. Tap + to add one.")
-            }
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -117,6 +128,10 @@ fun EmiListScreen(
                 showAddDialog = false
             },
         )
+    }
+
+    if (showTotals) {
+        EmiTotalsDialog(totals = periodTotals, onDismiss = { showTotals = false })
     }
 }
 

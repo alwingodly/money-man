@@ -27,17 +27,23 @@ fun addMonths(millis: Long, months: Int): Long =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).plusMonths(months.toLong())
         .toInstant().toEpochMilli()
 
+fun addDays(millis: Long, days: Int): Long =
+    Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).plusDays(days.toLong())
+        .toInstant().toEpochMilli()
+
+fun addWeeks(millis: Long, weeks: Int): Long = addDays(millis, weeks * 7)
+
 fun subtractDays(millis: Long, days: Int): Long =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).minusDays(days.toLong())
         .toInstant().toEpochMilli()
 
 private val monthAbbrevFormatter = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
 
-/** Two-line "Jul\n26" style label — used on compact UI like the EMI month grid. */
+/** Two-line "Jul\n2025" style label — used on compact UI like the EMI month grid. Uses the full
+ * four-digit year; a two-digit year ("26") reads like a day-of-month. */
 fun shortMonthYearLabel(millis: Long): String {
     val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-    val yearTwoDigit = (date.year % 100).toString().padStart(2, '0')
-    return "${date.format(monthAbbrevFormatter)}\n$yearTwoDigit"
+    return "${date.format(monthAbbrevFormatter)}\n${date.year}"
 }
 
 /** "Good morning"/"Good afternoon"/"Good evening" based on the current local time of day. */

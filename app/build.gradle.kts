@@ -1,4 +1,3 @@
-import java.io.FileInputStream
 import java.util.Properties
 
 plugins {
@@ -10,13 +9,13 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// Release signing — kept out of git; see keystore.properties (gitignored) and
-// keystore/moneymanager-release.jks (gitignored). Release build simply won't be
-// signed with this identity if the properties file isn't present (e.g. CI).
+// Release signing credentials live in keystore.properties (gitignored), never in the build
+// script. If the file is absent (e.g. a fresh clone or CI without secrets) the release build
+// simply falls back to being unsigned instead of failing to configure.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
-        load(FileInputStream(keystorePropertiesFile))
+        keystorePropertiesFile.inputStream().use { load(it) }
     }
 }
 
@@ -35,8 +34,8 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
-            create("release") {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -47,7 +46,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -12,14 +12,24 @@ import androidx.compose.ui.graphics.Color
  * constants would silently reset anyone who'd already picked a color back to the default.
  */
 enum class AppThemeColor(val label: String, val seed: Color) {
-    PURPLE("Indigo", Color(0xFF6366F1)),
-    BLUE("Sky", Color(0xFF0EA5E9)),
-    TEAL("Teal", Color(0xFF14B8A6)),
-    GREEN("Green", Color(0xFF22C55E)),
-    VIOLET("Violet", Color(0xFF8B5CF6)),
+    // Ordered as a rainbow for the picker (which renders in declaration order). Enum *names* stay
+    // stable — a user's choice is persisted as `.name` — so only add/reorder, never rename.
+    ROSE("Rose", Color(0xFFF43F5E)),
     RED("Red", Color(0xFFEF4444)),
-    MAGENTA("Magenta", Color(0xFFD946EF)),
     ORANGE("Orange", Color(0xFFF97316)),
+    AMBER("Amber", Color(0xFFF59E0B)),
+    LIME("Lime", Color(0xFF84CC16)),
+    GREEN("Green", Color(0xFF22C55E)),
+    EMERALD("Emerald", Color(0xFF10B981)),
+    TEAL("Teal", Color(0xFF14B8A6)),
+    CYAN("Cyan", Color(0xFF06B6D4)),
+    BLUE("Sky", Color(0xFF0EA5E9)),
+    COBALT("Blue", Color(0xFF3B82F6)),
+    PURPLE("Indigo", Color(0xFF6366F1)),
+    VIOLET("Violet", Color(0xFF8B5CF6)),
+    MAGENTA("Magenta", Color(0xFFD946EF)),
+    PINK("Pink", Color(0xFFEC4899)),
+    SLATE("Slate", Color(0xFF64748B)),
 }
 
 fun appThemeColorFromName(name: String?): AppThemeColor =

@@ -17,12 +17,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.filled.MoreVert
@@ -33,10 +35,15 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -46,16 +53,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
-import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.util.formatCurrency
 import java.text.DateFormat
 import java.time.LocalDate
@@ -71,28 +82,52 @@ private val granularities = listOf(
 @Composable
 fun ExpenseScreen(
     onDateSelected: (Long) -> Unit,
+    onSearchClick: () -> Unit,
+    onSummaryClick: () -> Unit,
     viewModel: ExpenseViewModel = hiltViewModel(),
 ) {
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
-    var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
 
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
     val periodFilter by viewModel.periodFilter.collectAsState()
     val expenses by viewModel.filteredExpenses.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    val selectedCategoryName = categories.firstOrNull { it.id == selectedCategoryId }?.name
     val total = expenses.sumOf { it.amount }
     var menuExpanded by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val onDeleteExpense: (Expense) -> Unit = { expense ->
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        viewModel.deleteExpense(expense)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "Expense deleted",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.restoreExpense(expense)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Expenses") },
                 actions = {
+                    IconButton(onClick = onSummaryClick) {
+                        Icon(Icons.Filled.BarChart, contentDescription = "Monthly and yearly summary")
+                    }
+                    IconButton(onClick = onSearchClick) {
+                        Icon(Icons.Filled.Search, contentDescription = "Search expenses")
+                    }
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = "View total for a specific day")
                     }
@@ -117,8 +152,12 @@ fun ExpenseScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddExpenseDialog = true },
-                containerColor = if (selectedCategoryId == null) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer,
+                // Always actionable: with no categories yet, "+" starts by creating one; otherwise
+                // it opens the add-expense dialog (which now has its own category picker).
+                onClick = {
+                    if (categories.isEmpty()) showAddCategoryDialog = true else showAddExpenseDialog = true
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add expense")
             }
@@ -139,11 +178,26 @@ fun ExpenseScreen(
             )
 
             when {
+                isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
                 categories.isEmpty() -> {
-                    EmptyState("Add a category to start tracking expenses.")
+                    EmptyState(
+                        icon = Icons.Filled.Receipt,
+                        title = "No categories yet",
+                        subtitle = "Add a category (like Food or Travel) to start tracking your spending.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 expenses.isEmpty() -> {
-                    EmptyState("No expenses in this period.")
+                    EmptyState(
+                        icon = Icons.Filled.Receipt,
+                        title = "Nothing here yet",
+                        subtitle = "Expenses you add for this period will show up here.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 periodFilter.granularity == PeriodGranularity.DAY -> {
                     LazyColumn(
@@ -155,7 +209,7 @@ fun ExpenseScreen(
                             ExpenseRow(
                                 expense = expense,
                                 showDate = false,
-                                onDelete = { expenseToDelete = expense },
+                                onDelete = { onDeleteExpense(expense) },
                                 onEditClick = { editingExpense = expense },
                             )
                         }
@@ -178,7 +232,7 @@ fun ExpenseScreen(
                                 ExpenseRow(
                                     expense = expense,
                                     showDate = false,
-                                    onDelete = { expenseToDelete = expense },
+                                    onDelete = { onDeleteExpense(expense) },
                                     onEditClick = { editingExpense = expense },
                                     modifier = Modifier.padding(bottom = 4.dp),
                                 )
@@ -190,39 +244,27 @@ fun ExpenseScreen(
         }
     }
 
-    if (showAddExpenseDialog && selectedCategoryName != null) {
+    if (showAddExpenseDialog && categories.isNotEmpty()) {
         AddExpenseDialog(
-            categoryLabel = selectedCategoryName,
+            categories = categories,
+            initialCategoryId = selectedCategoryId,
             onDismiss = { showAddExpenseDialog = false },
-            onConfirm = { amount, note, dateMillis, isCreditCard ->
-                viewModel.addExpense(amount, note, dateMillis, isCreditCard)
+            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard ->
+                viewModel.addExpense(categoryId, amount, note, dateMillis, isCreditCard)
                 showAddExpenseDialog = false
             },
         )
     }
 
     editingExpense?.let { expense ->
-        val categoryName = categories.firstOrNull { it.id == expense.categoryId }?.name ?: ""
         AddExpenseDialog(
-            categoryLabel = categoryName,
+            categories = categories,
             existing = expense,
             onDismiss = { editingExpense = null },
-            onConfirm = { amount, note, dateMillis, isCreditCard ->
-                viewModel.updateExpense(expense, amount, note, dateMillis, isCreditCard)
+            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard ->
+                viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard)
                 editingExpense = null
             },
-        )
-    }
-
-    expenseToDelete?.let { expense ->
-        ConfirmDeleteDialog(
-            title = "Delete expense?",
-            message = "This will permanently delete this expense.",
-            onConfirm = {
-                viewModel.deleteExpense(expense)
-                expenseToDelete = null
-            },
-            onDismiss = { expenseToDelete = null },
         )
     }
 
@@ -355,26 +397,6 @@ private fun DayHeader(date: LocalDate, subtotal: Double) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun EmptyState(message: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Filled.Receipt,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

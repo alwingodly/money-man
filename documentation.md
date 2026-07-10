@@ -8,13 +8,18 @@ starting a new module.
 
 - **UI:** Jetpack Compose, Material 3
 - **Architecture:** MVVM (ViewModel + StateFlow, Room DAOs expose Flow)
-- **DB:** Room (current schema version: 6)
+- **DB:** Room (current schema version: 12)
 - **Preferences:** DataStore (Preferences) — used for App Lock settings, Home section
   visibility, theme color, and profile (name/photo path)
 - **Serialization:** `kotlinx.serialization` (JSON) — used only for the Local Backup/Restore
   export format; entities are annotated `@Serializable` directly, no separate DTO layer
-- **Currency:** fixed to Rupee (₹) app-wide, no user-facing switcher — see `util/AppCurrency.kt`
-  (`formatCurrency()`). There used to be a Rupee/Dollar/Dinar picker; it was deliberately removed
+- **Currency:** Rupee/Dollar/Dinar, user-selectable from Settings (symbol only — see
+  `util/AppCurrency.kt`'s `CurrencyType`/`formatCurrency()`/`currentCurrency`, and
+  `data/repository/CurrencyRepository.kt` for the DataStore-backed choice). No conversion between
+  currencies is performed; switching just changes which symbol `formatCurrency()` prints
+  app-wide. This picker was built once, deliberately removed, then explicitly re-requested and
+  rebuilt on 2026-07-03 — if asked to remove it again, confirm first rather than assuming the
+  earlier removal still stands
 - **DI:** Hilt (including field injection into `BroadcastReceiver`s via `@AndroidEntryPoint`)
 - **Navigation:** Navigation Compose
 - **Biometrics:** `androidx.biometric` — requires `MainActivity` to be a `FragmentActivity`, not
@@ -33,9 +38,10 @@ reminders, loan amount/interest tracking, closed-loan archive, payoff celebratio
 that opens a full day-detail page, editable after the fact), a Profile screen (name + photo),
 a curated theme-color picker (shadcn/ui-style neutral surfaces + one accent color, applied
 app-wide), Local Backup/Restore (export/import a full JSON snapshot via Android's file picker),
-and App Lock (biometric/PIN). See "Done" section below. Bank Balance and Currency selection
-(Rupee/Dollar/Dinar toggle) were both built and then removed — do not re-add either without
-being asked; currency is now fixed to Rupee. Everything else is planned but not yet built.
+App Lock (biometric/PIN), a Rupee/Dollar/Dinar currency picker (symbol-only, no conversion), and
+a one-time swipeable onboarding tutorial (Home/EMI/Expenses/Settings, replayable from Settings →
+Help). See "Done" section below. Bank Balance was built and then removed — do not re-add it
+without being asked. Everything else is planned but not yet built.
 
 ---
 
@@ -388,10 +394,71 @@ being asked; currency is now fixed to Rupee. Everything else is planned but not 
      should be exported, so a parallel set of "export model" classes would be pure duplication
    - **Build this before WhatsApp export** — the WhatsApp feature reuses this exact
      `MoneyManagerExport` format, just swaps the destination `Intent`
+   - **Backup nudge:** a dismissible tertiary-container card at the top of Home reminds the user
+     to export when it's been 30+ days since their last backup (`BackupReminderRepository` tracks
+     `last_backup_millis`/`nudge_dismissed_millis`/`first_use_millis` in DataStore; the clock runs
+     from the most recent of those so new users aren't nagged on day one). `BackupRepository.exportTo`
+     calls `recordBackup()` on success; the card only shows when there's actual data to protect
+     (Home has active EMIs or recent activity). "Back up now" routes to Settings, the X snoozes
+
+8. **Expense Search** (`ui/expense/ExpenseSearchScreen.kt`, reached via the search icon in the
+   Expenses top bar → `Destination.ExpenseSearch`). Debounced free-text search over note text,
+   category name, and exact amount prefix (`ExpenseDao.searchExpenses`, a `LEFT JOIN` to
+   `expense_category`); tapping a result opens that expense's day-detail page. Read-only listing —
+   no edit/delete here, keeping it a pure "find it" surface
+
+9. **Personal Debt Ledger ("who owes whom")** — the digital paper `khata`. A 4th bottom-nav tab
+   (`Destination.Debts`, `ui/debt/`). Distinct from the formal `Emi` module. **One netted account
+   per person** (Khatabook/OkCredit model). This design was iterated hard — first lump-sum-per-debt
+   with partial payments, then one-ledger-per-(person,direction), then finally the current
+   one-account-per-person after the user found the same name appearing under both "you owe" and
+   "owes you" confusing. If asked to change the debt model again, re-read this whole item first.
+   - A **`Debt` = one person** (`personName`, no direction). **`DebtEntry` = each history line**:
+     `isGiven` true = **you gave** money (net +, toward them owing you), false = **you got** money
+     (net −). `DebtWithProgress.netBalance` = Σgiven − Σgot (signed); its **sign decides the
+     direction** (`>0` they owe you, `<0` you owe them, `0` settled). `outstanding` = |net|.
+     `isSettled` cached on `Debt.isSettled`, refreshed on every entry change.
+   - **One account per person, always:** `DebtRepository.addOrRecord` looks up by name
+     (`DebtDao.findAccount`, `COLLATE NOCASE`); appends an entry if the person exists, else creates
+     the account. There is no per-direction split — recording a "you got" bigger than the balance
+     just flips the net (legitimately), so no cap on amounts.
+   - **Detail = person ledger:** overview shows the net ("Ammu owes you ₹800" / "You owe Ammu ₹200"
+     / "All settled"), a "You gave X · You got Y" sub-line, then a unified newest-first history.
+     Two pinned actions **You gave** / **You got** (both always enabled) open `DebtAmountDialog`
+     (amount + **editable date**). Entry rows delete with Snackbar-undo + haptics.
+   - **List** = one card per person, split into **You'll get** (net>0) / **You'll give** (net<0)
+     section headers — each person in exactly one section, never both. Get/give summary header +
+     **name search**. Add dialog: **You gave / You got** chooser, name **autocomplete**
+     (`ExposedDropdownMenuBox`, chosen over device Contacts to stay permission-free), amount,
+     **date given/received**, note, optional due date + reminder. Settled accounts → searchable
+     **History** screen (`DebtHistoryScreen`), like the EMI "Closed loans" archive.
+   - **Home:** a `HomeSection.DEBTS` toggle (auto-added to Settings → Customize Home) shows two
+     tiles, **Owed to you** / **You owe**, from `HomeRepository`'s `debtToCollect`/`debtToPay`
+     (folded into the `getHomeSummary` combine via a `Triple` since the overload caps at 5 flows).
+   - **Migrations:** `MIGRATION_7_8` (debt/debt_payment) → `MIGRATION_8_9` (debt_entry ledger,
+     drop originalAmount) → **`MIGRATION_9_10`** (drop `isOwedToMe`, merge accounts by name,
+     `isCharge`→`isGiven` where `isGiven = (old isOwedToMe == old isCharge)`; full table rebuilds,
+     schema v10). Both entities `@Serializable` + in `MoneyManagerExport` (`debts`/`debtEntries`,
+     defaulted empty, `CURRENT_SCHEMA_VERSION` still 1) with `sqlite_sequence` resync.
+   - **Optional due-date reminder** (`DebtReminderScheduler`/`DebtReminderReceiver`, channel
+     `debt_reminders` + `DEBT_NOTIFICATION_TAG`; text/amount from the signed `DebtDao.getBalance`).
+     Rescheduled on boot alongside EMIs.
+
+10. **Savings pots** (`ui/saving/`, 5th bottom-nav tab `Destination.Savings`). A `Saving` with an
+    **optional** `targetAmount` goal, paid into by ad-hoc `SavingContribution`s of varying amounts
+    (`SavingRepository`/`SavingWithProgress`: `totalSaved` = Σ contributions, `progress`/`remaining`
+    /`isAchieved` are null/false when there's no target). List has a "Total saved" header + per-pot
+    cards (progress bar only when a goal is set); detail is a contributions ledger with a full-width
+    "Add to savings" button and Snackbar-undo on delete (mirrors the debt/EMI ledger pattern). No
+    reminders (savings have no due dates). New entities `Saving`/`SavingContribution` via
+    **`MIGRATION_11_12`** (schema v12), `@Serializable` + in `MoneyManagerExport`
+    (`savings`/`savingContributions`, defaulted empty) with `sqlite_sequence` resync. This is the
+    built version of the old "Desires / bucket list" idea below.
 
 ### 🔲 To Build
 
-9. **Desires (Bucket List)**
+9. **Desires (Bucket List)** — superseded by the **Savings pots** feature above (built); keep only
+   if a distinct "wish list" (separate from savings) is ever wanted.
    - Add desire: name, target amount
    - Track saved amount toward each desire (add contribution over time, like a mini savings goal)
    - Progress bar per desire (saved / target)
@@ -531,10 +598,16 @@ Profile                          // needed for WhatsApp import / multi-person vi
   registered there shipped once already and crashed on launch for anyone upgrading from an older
   schema version with `IllegalStateException: A migration from N to N+1 was required but not
   found`. Also remember to bump `@Database(version = ...)` in `MoneyManagerDatabase.kt` itself.
-- **Currency formatting is fixed to Rupee, not per-record or user-selectable.** Use
-  `formatCurrency()` from `util/AppCurrency.kt` everywhere amounts are displayed — don't use
-  `NumberFormat.getCurrencyInstance()` (follows device locale) and don't reintroduce a
-  currency-selection ViewModel/repository/DataStore key; that was tried and explicitly removed.
+- **Currency is user-selectable (Rupee/Dollar/Dinar) but symbol-only, not per-record.** Always
+  use `formatCurrency()` from `util/AppCurrency.kt` everywhere amounts are displayed — never
+  `NumberFormat.getCurrencyInstance()` (follows device locale instead of the user's in-app
+  choice). The current choice lives in a plain top-level `currentCurrency` (a `mutableStateOf`
+  in `AppCurrency.kt`, not a `CompositionLocal`), synced once at the root composable in
+  `MainActivity` from `CurrencyViewModel`/`CurrencyRepository`'s DataStore-backed value — this
+  lets every existing `formatCurrency()` call site (including plain non-`@Composable` helpers)
+  react to a change without threading the value through as a parameter everywhere. Don't add
+  per-record currency or conversion logic without being asked; that's a much bigger change
+  (new DB column, rethinking how EMI/expense totals aggregate across currencies).
 - **Side-effecting platform calls (alarms) live in the repository, next to the DB write they
   accompany**, not in ViewModels — see `EmiRepository.markNextMonthPaid`/`undoLastPayment`
   calling `EmiReminderScheduler` right after the DB mutation. This keeps "what triggers a

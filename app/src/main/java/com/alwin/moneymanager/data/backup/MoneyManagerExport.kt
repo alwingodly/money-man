@@ -1,9 +1,13 @@
 package com.alwin.moneymanager.data.backup
 
+import com.alwin.moneymanager.data.local.entity.Debt
+import com.alwin.moneymanager.data.local.entity.DebtEntry
 import com.alwin.moneymanager.data.local.entity.Emi
 import com.alwin.moneymanager.data.local.entity.EmiPayment
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
+import com.alwin.moneymanager.data.local.entity.Saving
+import com.alwin.moneymanager.data.local.entity.SavingContribution
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,8 +24,17 @@ data class MoneyManagerExport(
     val emiPayments: List<EmiPayment>,
     val expenseCategories: List<ExpenseCategory>,
     val expenses: List<Expense>,
+    // Added after the initial format. Default to empty so backups written by older app versions
+    // (which have no debt keys) still decode and restore cleanly.
+    val debts: List<Debt> = emptyList(),
+    val debtEntries: List<DebtEntry> = emptyList(),
+    val savings: List<Saving> = emptyList(),
+    val savingContributions: List<SavingContribution> = emptyList(),
 ) {
     companion object {
+        // Intentionally left at 1 even though debt fields were added: the new fields have safe
+        // defaults, so an older app can still restore the parts it understands rather than
+        // rejecting the whole file. Bump only for a breaking format change.
         const val CURRENT_SCHEMA_VERSION = 1
     }
 }

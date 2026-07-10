@@ -22,6 +22,8 @@ data class HomeSummary(
     val totalEmiOutstanding: Double,
     val creditCardThisMonth: Double,
     val savingsThisMonth: Double,
+    val debtToCollect: Double,
+    val debtToPay: Double,
 )
 
 private const val AVERAGE_WINDOW_MONTHS = 6L
@@ -30,6 +32,7 @@ private const val AVERAGE_WINDOW_MONTHS = 6L
 class HomeRepository @Inject constructor(
     private val emiRepository: EmiRepository,
     private val expenseRepository: ExpenseRepository,
+    private val debtRepository: DebtRepository,
 ) {
     fun getHomeSummary(): Flow<HomeSummary> {
         val zone = ZoneId.systemDefault()
@@ -42,19 +45,21 @@ class HomeRepository @Inject constructor(
             .minusMonths(AVERAGE_WINDOW_MONTHS - 1)
             .atStartOfDay(zone).toInstant().toEpochMilli()
 
-        // Nested first since the outer combine() overload tops out at 5 flows.
-        val paymentMethodSplit = combine(
+        // Nested first since the outer combine() overload tops out at 5 flows — the payment-method
+        // split and the debt summary are folded into one Triple here to stay within that limit.
+        val extras = combine(
             expenseRepository.getExpenseTotalForPeriodByPaymentMethod(monthStart, monthEnd, true),
             expenseRepository.getExpenseTotalForPeriodByPaymentMethod(monthStart, monthEnd, false),
-        ) { creditCard, savings -> creditCard to savings }
+            debtRepository.getSummary(),
+        ) { creditCard, savings, debt -> Triple(creditCard, savings, debt) }
 
         return combine(
             emiRepository.getAllEmisWithProgress(),
             expenseRepository.getExpenseTotalForPeriod(todayStart, todayEnd),
             expenseRepository.getExpenseTotalForPeriod(monthStart, monthEnd),
             expenseRepository.getExpenseTotalForPeriod(averageWindowStart, monthEnd),
-            paymentMethodSplit,
-        ) { emis, todayTotal, monthExpense, windowExpense, (creditCardThisMonth, savingsThisMonth) ->
+            extras,
+        ) { emis, todayTotal, monthExpense, windowExpense, (creditCardThisMonth, savingsThisMonth, debtSummary) ->
             // Counted by each installment's *due* month, not when it was actually marked paid —
             // see EmiRepository.paidAmountInRange for why (catching up on backlogged months in
             // one sitting shouldn't dump all of it into whichever month you happened to pay in).
@@ -73,6 +78,8 @@ class HomeRepository @Inject constructor(
                 totalEmiOutstanding = totalEmiOutstanding,
                 creditCardThisMonth = creditCardThisMonth,
                 savingsThisMonth = savingsThisMonth,
+                debtToCollect = debtSummary.totalToCollect,
+                debtToPay = debtSummary.totalToPay,
             )
         }
     }

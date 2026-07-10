@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -41,6 +42,13 @@ class ExpenseViewModel @Inject constructor(
         combine(categoryExpenses, _periodFilter) { expenses, filter ->
             filterByPeriod(expenses, filter)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // True until categories first load from Room, so the screen shows a spinner instead of
+    // briefly flashing "No categories yet" / "Nothing here yet" to a user who actually has data.
+    val isLoading: StateFlow<Boolean> =
+        repository.getAllCategories()
+            .map { false }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     init {
         viewModelScope.launch {
@@ -73,16 +81,22 @@ class ExpenseViewModel @Inject constructor(
         _periodFilter.value = current.copy(referenceMillis = shiftPeriod(current, delta))
     }
 
-    fun addExpense(amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
-        val categoryId = _selectedCategoryId.value ?: return
+    fun addExpense(categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
         viewModelScope.launch { repository.addExpense(categoryId, amount, note, dateMillis, isCreditCard) }
+        // Keep the on-screen category filter in sync with what was just added, so the new expense
+        // is visible in the list instead of hidden behind a different selected category.
+        _selectedCategoryId.value = categoryId
     }
 
-    fun updateExpense(expense: Expense, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
-        viewModelScope.launch { repository.updateExpense(expense, amount, note, dateMillis, isCreditCard) }
+    fun updateExpense(expense: Expense, categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
+        viewModelScope.launch { repository.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard) }
     }
 
     fun deleteExpense(expense: Expense) {
         viewModelScope.launch { repository.deleteExpense(expense) }
+    }
+
+    fun restoreExpense(expense: Expense) {
+        viewModelScope.launch { repository.restoreExpense(expense) }
     }
 }

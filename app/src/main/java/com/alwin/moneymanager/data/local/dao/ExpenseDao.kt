@@ -24,6 +24,25 @@ interface ExpenseDao {
     @Query("SELECT * FROM expense ORDER BY dateMillis DESC, id DESC LIMIT :limit")
     fun getRecentExpenses(limit: Int): Flow<List<Expense>>
 
+    /** Every expense, newest first — used for the month/year summary breakdown. */
+    @Query("SELECT * FROM expense ORDER BY dateMillis DESC, id DESC")
+    fun getAllExpenses(): Flow<List<Expense>>
+
+    /**
+     * Free-text search across a note or its category name, plus an exact amount match so a user
+     * can find "that ₹500 thing." [query] is matched case-insensitively as a substring; callers
+     * pass a non-blank, trimmed string. Newest first.
+     */
+    @Query(
+        "SELECT expense.* FROM expense " +
+            "LEFT JOIN expense_category ON expense.categoryId = expense_category.id " +
+            "WHERE expense.note LIKE '%' || :query || '%' " +
+            "OR expense_category.name LIKE '%' || :query || '%' " +
+            "OR CAST(expense.amount AS TEXT) LIKE :query || '%' " +
+            "ORDER BY expense.dateMillis DESC, expense.id DESC"
+    )
+    fun searchExpenses(query: String): Flow<List<Expense>>
+
     @Query(
         "SELECT COALESCE(SUM(amount), 0) FROM expense " +
             "WHERE dateMillis >= :startMillis AND dateMillis < :endMillis AND isCreditCard = :isCreditCard"
