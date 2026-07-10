@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.EmiWithProgress
@@ -58,6 +59,8 @@ import com.alwin.moneymanager.ui.expense.categoryColor
 import com.alwin.moneymanager.ui.profile.ProfileAvatar
 import com.alwin.moneymanager.ui.profile.ProfilePhotoViewerDialog
 import com.alwin.moneymanager.ui.profile.ProfileViewModel
+import com.alwin.moneymanager.ui.theme.LcdAmountText
+import com.alwin.moneymanager.ui.theme.LocalIsRetroLcdTheme
 import com.alwin.moneymanager.util.formatCurrency
 import com.alwin.moneymanager.util.timeOfDayGreeting
 import java.time.Instant
@@ -65,6 +68,12 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+// Cards on this screen hardcode a Material-style large corner radius; under Retro LCD that reads
+// as too soft/modern, so swap in the chunkier "plastic key" radius instead of the theme default.
+@Composable
+private fun cardShape(defaultCorner: Dp): RoundedCornerShape =
+    if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(defaultCorner)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -228,7 +237,7 @@ private fun BackupNudgeCard(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape(16.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -275,7 +284,7 @@ private fun BackupNudgeCard(
 private fun HeroCard(label: String, value: String, subLabel: String) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = cardShape(20.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -284,7 +293,7 @@ private fun HeroCard(label: String, value: String, subLabel: String) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-            Text(
+            LcdAmountText(
                 value,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
@@ -319,7 +328,7 @@ private fun QuickStatsGrid(stats: List<QuickStat>, modifier: Modifier = Modifier
 private fun QuickStatTile(stat: QuickStat, modifier: Modifier = Modifier) {
     ElevatedCard(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape(16.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -330,7 +339,7 @@ private fun QuickStatTile(stat: QuickStat, modifier: Modifier = Modifier) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            LcdAmountText(
                 stat.value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -363,7 +372,7 @@ private fun HomeBlock(
     }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = cardShape(20.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -448,7 +457,7 @@ private fun ActivityRow(item: RecentExpenseItem, onClick: () -> Unit) {
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
-        Text(
+        LcdAmountText(
             formatCurrency(item.expense.amount),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,

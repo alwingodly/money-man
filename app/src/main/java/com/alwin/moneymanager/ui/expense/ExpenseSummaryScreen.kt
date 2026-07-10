@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.ui.common.EmptyState
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 
 @Composable
@@ -138,7 +139,7 @@ private fun PeriodCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
+                LcdAmountText(
                     formatCurrency(period.total),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -158,7 +159,7 @@ private fun PeriodCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium)
-                        Text(
+                        LcdAmountText(
                             formatCurrency(cat.amount),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,

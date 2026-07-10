@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.DebtWithProgress
 import com.alwin.moneymanager.ui.common.EmptyState
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import com.alwin.moneymanager.util.shortMonthYearLabel
 
@@ -183,7 +184,7 @@ private fun SummaryTile(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = onContainer)
-            Text(
+            LcdAmountText(
                 formatCurrency(value),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -218,7 +219,7 @@ internal fun DebtRow(item: DebtWithProgress, onClick: () -> Unit) {
                 }
             }
             // Signed + colour-coded: green "+" = they owe you, red "−" = you owe them.
-            Text(
+            LcdAmountText(
                 (if (owesYou) "+" else "−") + formatCurrency(item.outstanding),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,

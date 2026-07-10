@@ -11,4 +11,6 @@ data class ExpenseCategory(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
+    /** Optional monthly spending limit for this category. Null = no budget set. */
+    val budgetLimit: Double? = null,
 )

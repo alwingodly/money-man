@@ -56,6 +56,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.EmiFrequency
 import com.alwin.moneymanager.data.repository.EmiWithProgress
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.theme.LcdAmountText
+import com.alwin.moneymanager.ui.theme.LocalIsRetroLcdTheme
 import com.alwin.moneymanager.util.currentCurrency
 import com.alwin.moneymanager.util.formatCurrency
 import com.alwin.moneymanager.util.installmentDueDate
@@ -69,6 +71,12 @@ import java.util.Date
 
 /** Day-of-month + short month, two lines, for weekly/daily installment cells. */
 private val cellDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d\nMMM")
+
+// Cards/cells on this screen hardcode a Material-style corner radius; under Retro LCD that reads
+// as too soft/modern, so swap in the chunkier "plastic key" radius instead of the theme default.
+@Composable
+private fun cardShape(defaultCorner: androidx.compose.ui.unit.Dp): RoundedCornerShape =
+    if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(defaultCorner)
 
 @Composable
 fun EmiDetailScreen(
@@ -332,7 +340,7 @@ fun EmiDetailScreen(
 private fun EmiOverviewCard(item: EmiWithProgress, dateFormat: DateFormat) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = cardShape(20.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -377,15 +385,16 @@ private fun EmiOverviewCard(item: EmiWithProgress, dateFormat: DateFormat) {
 
             item.totalInterest?.let { interest ->
                 HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
-                DetailRow(label = "Loan amount", value = formatCurrency(item.emi.loanAmount))
+                DetailRow(label = "Loan amount", value = formatCurrency(item.emi.loanAmount), isAmount = true)
                 Spacer(Modifier.height(10.dp))
-                DetailRow(label = "Total payable", value = formatCurrency(item.totalPayable))
+                DetailRow(label = "Total payable", value = formatCurrency(item.totalPayable), isAmount = true)
                 Spacer(Modifier.height(10.dp))
                 DetailRow(
                     label = "Total interest",
                     value = formatCurrency(interest),
                     valueColor = MaterialTheme.colorScheme.error,
                     emphasize = true,
+                    isAmount = true,
                 )
             }
 
@@ -396,6 +405,7 @@ private fun EmiOverviewCard(item: EmiWithProgress, dateFormat: DateFormat) {
                     value = formatCurrency(item.totalPenalty),
                     valueColor = MaterialTheme.colorScheme.error,
                     emphasize = true,
+                    isAmount = true,
                 )
             }
         }
@@ -410,7 +420,7 @@ private fun OverviewStat(label: String, value: String) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        LcdAmountText(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -420,6 +430,9 @@ private fun DetailRow(
     value: String,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
     emphasize: Boolean = false,
+    // Also reused for the non-numeric "Duration" date range, so callers opt into the LCD digit
+    // face rather than it being inferred from content.
+    isAmount: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -431,13 +444,23 @@ private fun DetailRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 12.dp),
         )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
-            color = valueColor,
-            textAlign = TextAlign.End,
-        )
+        if (isAmount) {
+            LcdAmountText(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
+                color = valueColor,
+                textAlign = TextAlign.End,
+            )
+        } else {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
+                color = valueColor,
+                textAlign = TextAlign.End,
+            )
+        }
     }
 }
 
@@ -464,7 +487,7 @@ private fun MonthCell(cell: MonthCellData, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .background(backgroundColor, RoundedCornerShape(8.dp)),
+            .background(backgroundColor, cardShape(8.dp)),
     ) {
         Text(
             text = cell.monthNumber.toString(),

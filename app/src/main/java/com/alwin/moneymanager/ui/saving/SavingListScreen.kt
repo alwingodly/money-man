@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.SavingWithProgress
 import com.alwin.moneymanager.ui.common.EmptyState
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 
 @Composable
@@ -72,7 +73,7 @@ fun SavingListScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
-                        Text(
+                        LcdAmountText(
                             formatCurrency(totalSaved),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
@@ -149,7 +150,7 @@ private fun SavingRow(item: SavingWithProgress, onClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
+                LcdAmountText(
                     formatCurrency(item.totalSaved),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,

@@ -65,6 +65,14 @@ fun dayRange(date: LocalDate): Pair<Long, Long> {
     return start to end
 }
 
+/** [start, endExclusive) millis range covering the current calendar month — used for budgets. */
+fun currentMonthRange(): Pair<Long, Long> {
+    val today = LocalDate.now(zone)
+    val start = today.withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val end = today.withDayOfMonth(1).plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return start to end
+}
+
 /** Groups already date-sorted (descending) expenses into per-day buckets, preserving order. */
 fun groupExpensesByDay(expenses: List<Expense>): List<Pair<LocalDate, List<Expense>>> =
     expenses.groupBy { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }.toList()

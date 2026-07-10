@@ -23,7 +23,7 @@ import com.alwin.moneymanager.data.local.entity.SavingContribution
         Debt::class, DebtEntry::class,
         Saving::class, SavingContribution::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

@@ -1,7 +1,9 @@
 package com.alwin.moneymanager.ui.emi
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.alwin.moneymanager.data.billing.BillingRepository
 import com.alwin.moneymanager.data.repository.EmiMonthSummary
 import com.alwin.moneymanager.data.repository.EmiPeriodTotals
 import com.alwin.moneymanager.data.repository.EmiRepository
@@ -18,7 +20,12 @@ import javax.inject.Inject
 @HiltViewModel
 class EmiViewModel @Inject constructor(
     private val repository: EmiRepository,
+    private val billingRepository: BillingRepository,
 ) : ViewModel() {
+
+    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
+
+    fun purchasePremium(activity: Activity) = billingRepository.purchasePremium(activity)
 
     /** Active loans only — closed ones move to [closedEmiList] to keep this list uncluttered. */
     val emiList: StateFlow<List<EmiWithProgress>> = repository.getAllEmisWithProgress()

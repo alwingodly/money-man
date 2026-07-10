@@ -56,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.DebtEntry
 import com.alwin.moneymanager.data.repository.DebtWithProgress
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -291,7 +292,7 @@ private fun DebtOverviewCard(item: DebtWithProgress, dateFormat: DateFormat) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
+            LcdAmountText(
                 formatCurrency(item.outstanding),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
@@ -348,7 +349,7 @@ private fun EntryRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
+        LcdAmountText(
             "$sign${formatCurrency(entry.amount)}",
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,

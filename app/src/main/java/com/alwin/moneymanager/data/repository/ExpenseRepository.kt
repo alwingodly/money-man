@@ -15,8 +15,15 @@ class ExpenseRepository @Inject constructor(
 ) {
     fun getAllCategories(): Flow<List<ExpenseCategory>> = expenseCategoryDao.getAllCategories()
 
-    suspend fun addCategory(name: String): Long =
-        expenseCategoryDao.insertCategory(ExpenseCategory(name = name))
+    suspend fun addCategory(name: String, budgetLimit: Double? = null): Long =
+        expenseCategoryDao.insertCategory(ExpenseCategory(name = name, budgetLimit = budgetLimit))
+
+    suspend fun updateCategory(category: ExpenseCategory, name: String, budgetLimit: Double?) {
+        expenseCategoryDao.updateCategory(category.copy(name = name, budgetLimit = budgetLimit))
+    }
+
+    fun getExpenseTotalForCategoryAndPeriod(categoryId: Long, startMillis: Long, endMillis: Long): Flow<Double> =
+        expenseDao.getExpenseTotalForCategoryAndPeriod(categoryId, startMillis, endMillis)
 
     fun getExpensesByCategory(categoryId: Long): Flow<List<Expense>> =
         expenseDao.getExpensesByCategory(categoryId)

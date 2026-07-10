@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.alwin.moneymanager.ui.theme.LocalIsRetroLcdTheme
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
@@ -54,7 +55,7 @@ fun CelebrationDialog(
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(340.dp)) {
             ConfettiBurst(modifier = Modifier.fillMaxWidth().height(340.dp))
             Card(
-                shape = RoundedCornerShape(24.dp),
+                shape = if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Column(

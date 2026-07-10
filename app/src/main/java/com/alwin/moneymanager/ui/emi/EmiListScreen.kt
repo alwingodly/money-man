@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,11 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.EmiWithProgress
+import com.alwin.moneymanager.data.repository.PremiumLimits
 import com.alwin.moneymanager.ui.common.EmptyState
+import com.alwin.moneymanager.ui.common.PaywallDialog
 import com.alwin.moneymanager.util.formatCurrency
 
 @Composable
@@ -48,9 +52,12 @@ fun EmiListScreen(
     val emiList by viewModel.emiList.collectAsState()
     val monthSummary by viewModel.monthSummary.collectAsState()
     val periodTotals by viewModel.periodTotals.collectAsState()
+    val isPremium by viewModel.isPremium.collectAsState()
+    val activity = LocalContext.current as Activity
     var showAddDialog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var showTotals by remember { mutableStateOf(false) }
+    var showEmiPaywall by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -94,7 +101,15 @@ fun EmiListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(
+                onClick = {
+                    if (!isPremium && emiList.size >= PremiumLimits.FREE_EMI_LIMIT) {
+                        showEmiPaywall = true
+                    } else {
+                        showAddDialog = true
+                    }
+                },
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add EMI")
             }
         },
@@ -132,6 +147,18 @@ fun EmiListScreen(
 
     if (showTotals) {
         EmiTotalsDialog(totals = periodTotals, onDismiss = { showTotals = false })
+    }
+
+    if (showEmiPaywall) {
+        PaywallDialog(
+            message = "Loan #${emiList.size + 1}! Grab me a ₹9 coffee and track as many loans " +
+                "as you like, forever.",
+            onDismiss = { showEmiPaywall = false },
+            onUnlock = {
+                viewModel.purchasePremium(activity)
+                showEmiPaywall = false
+            },
+        )
     }
 }
 

@@ -42,9 +42,10 @@ class MainActivity : FragmentActivity() {
         setContent {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val themeColor by themeViewModel.themeColor.collectAsState()
+            val themeStyle by themeViewModel.themeStyle.collectAsState()
             val currencyViewModel: CurrencyViewModel = hiltViewModel()
             currentCurrency = currencyViewModel.currency.collectAsState().value
-            MoneyManagerTheme(seedColor = themeColor.seed) {
+            MoneyManagerTheme(seedColor = themeColor.seed, themeStyle = themeStyle) {
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
                 val hasSeenOnboarding by onboardingViewModel.hasSeenOnboarding.collectAsState()
                 if (hasSeenOnboarding) {

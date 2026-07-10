@@ -1,5 +1,6 @@
 package com.alwin.moneymanager.ui.settings
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -42,6 +44,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -63,10 +69,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.HomeSection
 import com.alwin.moneymanager.ui.applock.AppLockViewModel
+import com.alwin.moneymanager.ui.common.PaywallDialog
 import com.alwin.moneymanager.ui.home.HomeSectionsViewModel
 import com.alwin.moneymanager.ui.navigation.NavTabsViewModel
 import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
 import com.alwin.moneymanager.ui.theme.AppThemeColor
+import com.alwin.moneymanager.ui.theme.AppThemeStyle
+import com.alwin.moneymanager.ui.theme.FREE_THEME_COLORS
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
 import com.alwin.moneymanager.util.CurrencyType
 import java.text.SimpleDateFormat
@@ -91,7 +100,10 @@ fun SettingsScreen(
     val isBackupWorking by backupViewModel.isWorking.collectAsState()
     val backupEvent by backupViewModel.event.collectAsState()
     var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var themePaywallMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val activity = context as Activity
+    val isPremium by themeViewModel.isPremium.collectAsState()
 
     LaunchedEffect(backupEvent) {
         val event = backupEvent ?: return@LaunchedEffect
@@ -150,12 +162,56 @@ fun SettingsScreen(
 
             SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
                 Text(
+                    "Theme style",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                ThemeStylePicker(
+                    themeViewModel = themeViewModel,
+                    isPremium = isPremium,
+                    onLockedStyleClick = {
+                        themePaywallMessage = "Retro LCD is a premium look — grab me a ₹9 " +
+                            "coffee and unlock it (plus every other color) for good."
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+
+                val themeStyle by themeViewModel.themeStyle.collectAsState()
+                val colorPickerEnabled = themeStyle == AppThemeStyle.DEFAULT
+                Text(
                     "Theme color",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                ThemeColorPicker(themeViewModel)
+                ThemeColorPicker(
+                    themeViewModel = themeViewModel,
+                    enabled = colorPickerEnabled,
+                    isPremium = isPremium,
+                    onLockedColorClick = {
+                        themePaywallMessage = "That one's a premium color — grab me a ₹9 " +
+                            "coffee and unlock the whole crazy palette (plus Retro LCD)."
+                    },
+                )
+            }
+
+            SettingsSection(title = "Premium", icon = Icons.Filled.LocalCafe) {
+                if (isPremium) {
+                    Text(
+                        "You've unlocked premium — thank you for the coffee! ☕",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    ActionRow(
+                        title = "Buy me a coffee",
+                        subtitle = "Unlock unlimited categories, unlimited loans, every theme " +
+                            "color, and Retro LCD",
+                        buttonLabel = "₹9",
+                        enabled = true,
+                        onClick = { themeViewModel.purchasePremium(activity) },
+                    )
+                }
             }
 
             SettingsSection(title = "Currency", icon = Icons.Filled.CurrencyExchange) {
@@ -265,6 +321,17 @@ fun SettingsScreen(
             },
         )
     }
+
+    themePaywallMessage?.let { message ->
+        PaywallDialog(
+            message = message,
+            onDismiss = { themePaywallMessage = null },
+            onUnlock = {
+                themeViewModel.purchasePremium(activity)
+                themePaywallMessage = null
+            },
+        )
+    }
 }
 
 @Composable
@@ -301,17 +368,54 @@ private fun SettingDivider() {
 }
 
 @Composable
-private fun ThemeColorPicker(themeViewModel: ThemeViewModel) {
+private fun ThemeStylePicker(
+    themeViewModel: ThemeViewModel,
+    isPremium: Boolean,
+    onLockedStyleClick: () -> Unit,
+) {
+    val selected by themeViewModel.themeStyle.collectAsState()
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        AppThemeStyle.entries.forEachIndexed { index, style ->
+            val locked = style == AppThemeStyle.RETRO_LCD && !isPremium
+            SegmentedButton(
+                selected = style == selected,
+                onClick = { if (locked) onLockedStyleClick() else themeViewModel.setThemeStyle(style) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = AppThemeStyle.entries.size),
+                icon = {
+                    if (locked) {
+                        Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                    } else {
+                        SegmentedButtonDefaults.Icon(active = style == selected)
+                    }
+                },
+            ) {
+                Text(style.label)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeColorPicker(
+    themeViewModel: ThemeViewModel,
+    enabled: Boolean = true,
+    isPremium: Boolean,
+    onLockedColorClick: () -> Unit,
+) {
     val selected by themeViewModel.themeColor.collectAsState()
     LazyRow(
+        modifier = Modifier.alpha(if (enabled) 1f else 0.4f),
         contentPadding = PaddingValues(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(AppThemeColor.entries) { color ->
+            val locked = color !in FREE_THEME_COLORS && !isPremium
             ColorSwatch(
                 color = color,
                 isSelected = color == selected,
-                onClick = { themeViewModel.setThemeColor(color) },
+                enabled = enabled,
+                locked = locked,
+                onClick = { if (locked) onLockedColorClick() else themeViewModel.setThemeColor(color) },
             )
         }
     }
@@ -347,7 +451,13 @@ private fun CurrencyChip(type: CurrencyType, isSelected: Boolean, onClick: () ->
 }
 
 @Composable
-private fun ColorSwatch(color: AppThemeColor, isSelected: Boolean, onClick: () -> Unit) {
+private fun ColorSwatch(
+    color: AppThemeColor,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    locked: Boolean = false,
+) {
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -359,11 +469,12 @@ private fun ColorSwatch(color: AppThemeColor, isSelected: Boolean, onClick: () -
                     Modifier
                 }
             )
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (isSelected) {
-            Icon(Icons.Filled.Check, contentDescription = color.label, tint = Color.White)
+        when {
+            locked -> Icon(Icons.Filled.Lock, contentDescription = "${color.label} — premium", tint = Color.White, modifier = Modifier.size(18.dp))
+            isSelected -> Icon(Icons.Filled.Check, contentDescription = color.label, tint = Color.White)
         }
     }
 }

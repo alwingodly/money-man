@@ -34,3 +34,24 @@ enum class AppThemeColor(val label: String, val seed: Color) {
 
 fun appThemeColorFromName(name: String?): AppThemeColor =
     AppThemeColor.entries.firstOrNull { it.name == name } ?: AppThemeColor.PURPLE
+
+/**
+ * The three "sensible default" colors free users can pick — Indigo (the app's own out-of-the-box
+ * default), Blue, and Green. Every other, brighter color is part of the paid "crazy colors" set,
+ * unlocked via the same one-time purchase as [com.alwin.moneymanager.ui.theme.AppThemeStyle.RETRO_LCD].
+ */
+val FREE_THEME_COLORS = setOf(AppThemeColor.PURPLE, AppThemeColor.COBALT, AppThemeColor.GREEN)
+
+/**
+ * Overall theme look, orthogonal to [AppThemeColor]. [RETRO_LCD] replaces the whole Material
+ * color scheme and typography (calculator/old-phone LCD screen: olive-green background, black
+ * text, monospace digits) rather than just swapping the accent color, so it's a separate axis
+ * from the color picker instead of one more [AppThemeColor] entry.
+ */
+enum class AppThemeStyle(val label: String) {
+    DEFAULT("Default"),
+    RETRO_LCD("Retro LCD"),
+}
+
+fun appThemeStyleFromName(name: String?): AppThemeStyle =
+    AppThemeStyle.entries.firstOrNull { it.name == name } ?: AppThemeStyle.DEFAULT

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alwin.moneymanager.data.repository.EmiPeriodTotals
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import java.time.Month
 import java.time.format.TextStyle
@@ -33,7 +34,7 @@ fun EmiTotalsDialog(totals: EmiPeriodTotals, onDismiss: () -> Unit) {
             if (totals.months.isEmpty()) {
                 Text("No EMIs yet.")
             } else {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     SectionLabel("By year")
                     totals.years.forEach { TotalRow(it.year.toString(), it.amount) }
 
@@ -68,7 +69,7 @@ private fun TotalRow(label: String, amount: Double) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(formatCurrency(amount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        LcdAmountText(formatCurrency(amount), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

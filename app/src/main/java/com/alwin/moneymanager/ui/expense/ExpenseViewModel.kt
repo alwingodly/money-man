@@ -1,7 +1,9 @@
 package com.alwin.moneymanager.ui.expense
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.alwin.moneymanager.data.billing.BillingRepository
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import com.alwin.moneymanager.data.repository.ExpenseRepository
@@ -23,7 +25,12 @@ import javax.inject.Inject
 @HiltViewModel
 class ExpenseViewModel @Inject constructor(
     private val repository: ExpenseRepository,
+    private val billingRepository: BillingRepository,
 ) : ViewModel() {
+
+    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
+
+    fun purchasePremium(activity: Activity) = billingRepository.purchasePremium(activity)
 
     private val _categories = MutableStateFlow<List<ExpenseCategory>>(emptyList())
     val categories: StateFlow<List<ExpenseCategory>> = _categories.asStateFlow()
@@ -42,6 +49,17 @@ class ExpenseViewModel @Inject constructor(
         combine(categoryExpenses, _periodFilter) { expenses, filter ->
             filterByPeriod(expenses, filter)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Current calendar month's spend for the selected category, independent of whatever period
+    // the user is currently browsing — a budget is always a monthly concept.
+    val currentMonthSpendForSelectedCategory: StateFlow<Double> = _selectedCategoryId.flatMapLatest { categoryId ->
+        if (categoryId == null) {
+            flowOf(0.0)
+        } else {
+            val (start, end) = currentMonthRange()
+            repository.getExpenseTotalForCategoryAndPeriod(categoryId, start, end)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     // True until categories first load from Room, so the screen shows a spinner instead of
     // briefly flashing "No categories yet" / "Nothing here yet" to a user who actually has data.
@@ -65,11 +83,15 @@ class ExpenseViewModel @Inject constructor(
         _selectedCategoryId.value = categoryId
     }
 
-    fun addCategory(name: String) {
+    fun addCategory(name: String, budgetLimit: Double?) {
         viewModelScope.launch {
-            val id = repository.addCategory(name)
+            val id = repository.addCategory(name, budgetLimit)
             _selectedCategoryId.value = id
         }
+    }
+
+    fun updateCategory(category: ExpenseCategory, name: String, budgetLimit: Double?) {
+        viewModelScope.launch { repository.updateCategory(category, name, budgetLimit) }
     }
 
     fun setGranularity(granularity: PeriodGranularity) {

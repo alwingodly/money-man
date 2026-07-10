@@ -3,6 +3,7 @@ package com.alwin.moneymanager.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import kotlinx.coroutines.flow.Flow
 
@@ -14,6 +15,9 @@ interface ExpenseCategoryDao {
 
     @Insert
     suspend fun insertCategory(category: ExpenseCategory): Long
+
+    @Update
+    suspend fun updateCategory(category: ExpenseCategory)
 
     @Query("SELECT * FROM expense_category")
     suspend fun getAllCategoriesSnapshot(): List<ExpenseCategory>

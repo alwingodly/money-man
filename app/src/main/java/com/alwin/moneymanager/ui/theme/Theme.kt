@@ -1,13 +1,29 @@
 package com.alwin.moneymanager.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+
+/**
+ * True when [AppThemeStyle.RETRO_LCD] is active. Read by components that need to change shape
+ * (not just color/type) to sell the calculator-LCD look — e.g. hardcoded `RoundedCornerShape`
+ * card corners, or [LcdAmountText] choosing the seven-segment face — since Material3's own
+ * `MaterialTheme.shapes`/`.typography` slots don't reach every corner of a component (Button's
+ * shape in particular is a hardcoded pill token, not theme-driven).
+ */
+val LocalIsRetroLcdTheme = compositionLocalOf { false }
 
 // Neutral zinc-gray scale — a white/near-black surface base with no hue tint of its own, so the
 // picked theme color reads as a single clear accent (shadcn/ui style) instead of the whole app
@@ -115,19 +131,125 @@ private fun tonalColorScheme(seed: Color, dark: Boolean): ColorScheme {
     }
 }
 
+// Digital-display negative palette: true AMOLED black "screen" with near-white "lit segment"
+// text — not an attempt at LCD green, which never reads right on an emissive phone display the
+// way it does on a reflective calculator screen. Black-background/white-foreground is also the
+// one polarity that actually benefits from AMOLED (true black pixels are off, not just dark gray).
+// Dark-only: this ignores the `darkTheme` param entirely, same as the light-only version it
+// replaced — a digital-display readout doesn't get a second "light mode".
+private object Lcd {
+    val Background = Color(0xFF000000)
+    val SurfaceVariant = Color(0xFF1A1A18)
+    val SurfaceContainerLow = Color(0xFF121210)
+    val SurfaceContainer = Color(0xFF1A1A18)
+    val SurfaceContainerHigh = Color(0xFF242422)
+    val SurfaceContainerHighest = Color(0xFF2E2E2B)
+    val Text = Color(0xFFEDEDE6)
+    // Mid-light gray accent — the equivalent of the old palette's dark "ink" accent, just
+    // inverted: against a black screen the accent has to be *lighter* than background to read.
+    val Accent = Color(0xFFB8B8AE)
+    val AccentLight = Color(0xFF86867C)
+    val AccentContainer = Color(0xFF3A3A36)
+    val Error = Color(0xFFE0A0A0)
+    // A dark tint of Error, not Error itself — call sites like DebtListScreen's "You'll give"
+    // tile paint `errorContainer` as the background and `error` as the text color on top of it,
+    // same pattern as every other *Container/on*Container pair; reusing Error for both makes
+    // that text invisible against its own background.
+    val ErrorContainer = Color(0xFF4A2626)
+}
+
+private val retroLcdColorScheme: ColorScheme = darkColorScheme(
+    primary = Lcd.Text,
+    onPrimary = Lcd.Background,
+    primaryContainer = Lcd.Accent,
+    onPrimaryContainer = Lcd.Background,
+    secondary = Lcd.Accent,
+    onSecondary = Lcd.Background,
+    secondaryContainer = Lcd.AccentContainer,
+    onSecondaryContainer = Lcd.Text,
+    tertiary = Lcd.Accent,
+    onTertiary = Lcd.Background,
+    tertiaryContainer = Lcd.AccentContainer,
+    onTertiaryContainer = Lcd.Text,
+    background = Lcd.Background,
+    onBackground = Lcd.Text,
+    surface = Lcd.Background,
+    onSurface = Lcd.Text,
+    surfaceVariant = Lcd.SurfaceVariant,
+    onSurfaceVariant = Lcd.Accent,
+    outline = Lcd.Accent,
+    outlineVariant = Lcd.AccentLight,
+    surfaceContainerLowest = Lcd.Background,
+    surfaceContainerLow = Lcd.SurfaceContainerLow,
+    surfaceContainer = Lcd.SurfaceContainer,
+    surfaceContainerHigh = Lcd.SurfaceContainerHigh,
+    surfaceContainerHighest = Lcd.SurfaceContainerHighest,
+    inverseSurface = Lcd.Text,
+    inverseOnSurface = Lcd.Background,
+    error = Lcd.Error,
+    onError = Lcd.Background,
+    errorContainer = Lcd.ErrorContainer,
+    onErrorContainer = Lcd.Error,
+)
+
+// Same type scale as the app-wide [Typography] (sizes/spacing), just swapped to a monospace
+// face — sells the "digital display" feel the Retro LCD theme is going for.
+private val retroLcdTypography: Typography = run {
+    val base = Typography
+    Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = FontFamily.Monospace),
+        displayMedium = base.displayMedium.copy(fontFamily = FontFamily.Monospace),
+        displaySmall = base.displaySmall.copy(fontFamily = FontFamily.Monospace),
+        headlineLarge = base.headlineLarge.copy(fontFamily = FontFamily.Monospace),
+        headlineMedium = base.headlineMedium.copy(fontFamily = FontFamily.Monospace),
+        headlineSmall = base.headlineSmall.copy(fontFamily = FontFamily.Monospace),
+        titleLarge = base.titleLarge.copy(fontFamily = FontFamily.Monospace),
+        titleMedium = base.titleMedium.copy(fontFamily = FontFamily.Monospace),
+        titleSmall = base.titleSmall.copy(fontFamily = FontFamily.Monospace),
+        bodyLarge = base.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+        bodyMedium = base.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+        bodySmall = base.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        labelLarge = base.labelLarge.copy(fontFamily = FontFamily.Monospace),
+        labelMedium = base.labelMedium.copy(fontFamily = FontFamily.Monospace),
+        labelSmall = base.labelSmall.copy(fontFamily = FontFamily.Monospace),
+    )
+}
+
+// Chunky, mostly-square "injection-molded plastic key" corners — a small fixed radius rather
+// than Material 3's default pill/large-radius scale — since sharp rectangles read as a modern
+// flat-design choice (terminal/DOS), not a physical calculator, which always has *some* corner
+// rounding. Note this only reaches components that read `MaterialTheme.shapes.*` (Card, Dialog,
+// TextField, Chip, NavigationBar indicator, FAB); Button's shape is a hardcoded M3 token and
+// components with a literal `RoundedCornerShape(..)` need their own [LocalIsRetroLcdTheme] check.
+private val retroLcdShapes = Shapes(
+    extraSmall = RoundedCornerShape(3.dp),
+    small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(6.dp),
+    extraLarge = RoundedCornerShape(8.dp),
+)
+
 @Composable
 fun MoneyManagerTheme(
     seedColor: Color = AppThemeColor.PURPLE.seed,
+    themeStyle: AppThemeStyle = AppThemeStyle.DEFAULT,
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val isRetro = themeStyle == AppThemeStyle.RETRO_LCD
+
     // Dynamic (wallpaper-based) color is deliberately not used — the user picks a color
     // explicitly in Settings instead, and that should always win regardless of OS version.
-    val colorScheme = tonalColorScheme(seedColor, darkTheme)
+    val colorScheme = if (isRetro) retroLcdColorScheme else tonalColorScheme(seedColor, darkTheme)
+    val typography = if (isRetro) retroLcdTypography else Typography
+    val shapes = if (isRetro) retroLcdShapes else Shapes()
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalIsRetroLcdTheme provides isRetro) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = typography,
+            shapes = shapes,
+            content = content,
+        )
+    }
 }

@@ -78,6 +78,14 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Optional per-category monthly spending limit. Nullable, no default clause — mirrors
+        // Saving.targetAmount's "null = not set" pattern rather than a 0.0 sentinel.
+        db.execSQL("ALTER TABLE expense_category ADD COLUMN budgetLimit REAL")
+    }
+}
+
 val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Collapse the per-direction debt accounts into ONE account per person (Khatabook-style).

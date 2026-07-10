@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.ui.common.EmptyState
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import java.time.Instant
 import java.time.ZoneId
@@ -135,7 +136,7 @@ private fun SearchResultRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
+        LcdAmountText(
             formatCurrency(amount),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,

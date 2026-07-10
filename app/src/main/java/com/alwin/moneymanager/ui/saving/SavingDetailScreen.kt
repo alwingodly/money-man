@@ -52,6 +52,7 @@ import com.alwin.moneymanager.data.local.entity.SavingContribution
 import com.alwin.moneymanager.data.repository.SavingWithProgress
 import com.alwin.moneymanager.ui.common.CelebrationDialog
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -226,7 +227,7 @@ private fun SavingOverviewCard(item: SavingWithProgress) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
+            LcdAmountText(
                 formatCurrency(item.totalSaved),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
@@ -260,7 +261,7 @@ private fun ContributionRow(contribution: SavingContribution, dateFormat: DateFo
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("+${formatCurrency(contribution.amount)}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            LcdAmountText("+${formatCurrency(contribution.amount)}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(
                 dateFormat.format(Date(contribution.dateMillis)),
                 style = MaterialTheme.typography.bodySmall,
