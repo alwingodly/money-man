@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 import com.alwin.moneymanager.data.repository.SavingWithProgress
+import com.alwin.moneymanager.ui.common.CelebrationDialog
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.util.formatCurrency
 import kotlinx.coroutines.launch
@@ -67,6 +69,16 @@ fun SavingDetailScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showAddContribution by remember { mutableStateOf(false) }
+    var showGoalReached by remember { mutableStateOf(false) }
+
+    // Fire the celebration only on a genuine "just crossed the goal" transition — not when opening
+    // an already-achieved pot (we seed the previous state on first load and celebrate later flips).
+    var wasAchieved by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(item) {
+        val achieved = item?.isAchieved ?: return@LaunchedEffect
+        if (wasAchieved == false && achieved) showGoalReached = true
+        wasAchieved = achieved
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -176,6 +188,15 @@ fun SavingDetailScreen(
                 viewModel.updateSaving(form)
                 showEditDialog = false
             },
+        )
+    }
+
+    if (showGoalReached && current != null) {
+        CelebrationDialog(
+            emoji = "🏆",
+            title = "Goal reached!",
+            message = "You saved the full ${formatCurrency(current.saving.targetAmount ?: 0.0)} for ${current.saving.name}. Well done!",
+            onDismiss = { showGoalReached = false },
         )
     }
 
