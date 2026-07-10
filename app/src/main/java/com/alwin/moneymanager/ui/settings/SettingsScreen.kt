@@ -235,6 +235,8 @@ fun SettingsScreen(
                     onClick = onboardingViewModel::resetOnboarding,
                 )
             }
+
+            AppVersionFooter(modifier = Modifier.padding(top = 8.dp))
         }
     }
 
