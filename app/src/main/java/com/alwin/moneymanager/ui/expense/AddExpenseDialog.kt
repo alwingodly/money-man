@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import com.alwin.moneymanager.ui.common.DateField
@@ -56,6 +57,8 @@ fun AddExpenseDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         title = { Text(if (isEditing) "Edit expense" else "Add expense") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {

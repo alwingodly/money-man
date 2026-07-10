@@ -88,6 +88,7 @@ fun HomeScreen(
     val showThisMonth by sectionsViewModel.visibility.getValue(HomeSection.THIS_MONTH).collectAsState()
     val showPaymentMethod by sectionsViewModel.visibility.getValue(HomeSection.PAYMENT_METHOD).collectAsState()
     val showEmi by sectionsViewModel.visibility.getValue(HomeSection.EMI).collectAsState()
+    val showDebts by sectionsViewModel.visibility.getValue(HomeSection.DEBTS).collectAsState()
     val showMonthlyAverage by sectionsViewModel.visibility.getValue(HomeSection.MONTHLY_AVERAGE).collectAsState()
     val showRecentActivity by sectionsViewModel.visibility.getValue(HomeSection.RECENT_ACTIVITY).collectAsState()
     val profileName by profileViewModel.name.collectAsState()
@@ -174,6 +175,10 @@ fun HomeScreen(
                         )
                     )
                     add(QuickStat("Total outstanding", formatCurrency(summary.totalEmiOutstanding)))
+                }
+                if (showDebts) {
+                    add(QuickStat("Owed to you", formatCurrency(summary.debtToCollect)))
+                    add(QuickStat("You owe", formatCurrency(summary.debtToPay)))
                 }
                 if (showMonthlyAverage) {
                     add(QuickStat("Avg (expenses)", formatCurrency(summary.monthlyAverageExpenseOnly)))

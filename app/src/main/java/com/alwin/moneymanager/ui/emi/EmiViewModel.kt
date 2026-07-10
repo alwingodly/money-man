@@ -3,8 +3,10 @@ package com.alwin.moneymanager.ui.emi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alwin.moneymanager.data.repository.EmiMonthSummary
+import com.alwin.moneymanager.data.repository.EmiPeriodTotals
 import com.alwin.moneymanager.data.repository.EmiRepository
 import com.alwin.moneymanager.data.repository.EmiWithProgress
+import com.alwin.moneymanager.data.repository.periodTotals
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,11 @@ class EmiViewModel @Inject constructor(
     val monthSummary: StateFlow<EmiMonthSummary> = repository.getCurrentMonthSummary()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EmiMonthSummary(0.0, 0.0))
 
+    /** EMI outgoing bucketed by month and year (every loan's whole schedule), for the totals view. */
+    val periodTotals: StateFlow<EmiPeriodTotals> = repository.getAllEmisWithProgress()
+        .map { it.periodTotals() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EmiPeriodTotals(emptyList(), emptyList()))
+
     fun addEmi(form: EmiFormResult) {
         viewModelScope.launch {
             repository.addEmi(
@@ -37,11 +44,13 @@ class EmiViewModel @Inject constructor(
                 monthlyAmount = form.monthlyAmount,
                 totalMonths = form.totalMonths,
                 startDateMillis = form.startDateMillis,
-                endDateMillis = form.endDateMillis,
                 notes = form.notes,
                 notificationEnabled = form.notificationEnabled,
                 reminderDaysBefore = form.reminderDaysBefore,
                 loanAmount = form.loanAmount,
+                frequency = form.frequency,
+                offDaysMask = form.offDaysMask,
+                intervalDays = form.intervalDays,
             )
         }
     }

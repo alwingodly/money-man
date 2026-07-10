@@ -5,7 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.alwin.moneymanager.data.local.entity.Emi
-import com.alwin.moneymanager.util.addMonths
+import com.alwin.moneymanager.util.installmentDueDate
 import com.alwin.moneymanager.util.subtractDays
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -23,7 +23,7 @@ class EmiReminderScheduler @Inject constructor(
             cancelReminder(emi.id)
             return
         }
-        val dueDateMillis = addMonths(emi.startDateMillis, paidMonths)
+        val dueDateMillis = installmentDueDate(emi, paidMonths)
         val triggerAtMillis = subtractDays(dueDateMillis, emi.reminderDaysBefore)
         if (triggerAtMillis <= System.currentTimeMillis()) {
             cancelReminder(emi.id)

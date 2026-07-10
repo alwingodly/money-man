@@ -8,7 +8,7 @@ starting a new module.
 
 - **UI:** Jetpack Compose, Material 3
 - **Architecture:** MVVM (ViewModel + StateFlow, Room DAOs expose Flow)
-- **DB:** Room (current schema version: 7)
+- **DB:** Room (current schema version: 12)
 - **Preferences:** DataStore (Preferences) — used for App Lock settings, Home section
   visibility, theme color, and profile (name/photo path)
 - **Serialization:** `kotlinx.serialization` (JSON) — used only for the Local Backup/Restore
@@ -407,9 +407,58 @@ without being asked. Everything else is planned but not yet built.
    `expense_category`); tapping a result opens that expense's day-detail page. Read-only listing —
    no edit/delete here, keeping it a pure "find it" surface
 
+9. **Personal Debt Ledger ("who owes whom")** — the digital paper `khata`. A 4th bottom-nav tab
+   (`Destination.Debts`, `ui/debt/`). Distinct from the formal `Emi` module. **One netted account
+   per person** (Khatabook/OkCredit model). This design was iterated hard — first lump-sum-per-debt
+   with partial payments, then one-ledger-per-(person,direction), then finally the current
+   one-account-per-person after the user found the same name appearing under both "you owe" and
+   "owes you" confusing. If asked to change the debt model again, re-read this whole item first.
+   - A **`Debt` = one person** (`personName`, no direction). **`DebtEntry` = each history line**:
+     `isGiven` true = **you gave** money (net +, toward them owing you), false = **you got** money
+     (net −). `DebtWithProgress.netBalance` = Σgiven − Σgot (signed); its **sign decides the
+     direction** (`>0` they owe you, `<0` you owe them, `0` settled). `outstanding` = |net|.
+     `isSettled` cached on `Debt.isSettled`, refreshed on every entry change.
+   - **One account per person, always:** `DebtRepository.addOrRecord` looks up by name
+     (`DebtDao.findAccount`, `COLLATE NOCASE`); appends an entry if the person exists, else creates
+     the account. There is no per-direction split — recording a "you got" bigger than the balance
+     just flips the net (legitimately), so no cap on amounts.
+   - **Detail = person ledger:** overview shows the net ("Ammu owes you ₹800" / "You owe Ammu ₹200"
+     / "All settled"), a "You gave X · You got Y" sub-line, then a unified newest-first history.
+     Two pinned actions **You gave** / **You got** (both always enabled) open `DebtAmountDialog`
+     (amount + **editable date**). Entry rows delete with Snackbar-undo + haptics.
+   - **List** = one card per person, split into **You'll get** (net>0) / **You'll give** (net<0)
+     section headers — each person in exactly one section, never both. Get/give summary header +
+     **name search**. Add dialog: **You gave / You got** chooser, name **autocomplete**
+     (`ExposedDropdownMenuBox`, chosen over device Contacts to stay permission-free), amount,
+     **date given/received**, note, optional due date + reminder. Settled accounts → searchable
+     **History** screen (`DebtHistoryScreen`), like the EMI "Closed loans" archive.
+   - **Home:** a `HomeSection.DEBTS` toggle (auto-added to Settings → Customize Home) shows two
+     tiles, **Owed to you** / **You owe**, from `HomeRepository`'s `debtToCollect`/`debtToPay`
+     (folded into the `getHomeSummary` combine via a `Triple` since the overload caps at 5 flows).
+   - **Migrations:** `MIGRATION_7_8` (debt/debt_payment) → `MIGRATION_8_9` (debt_entry ledger,
+     drop originalAmount) → **`MIGRATION_9_10`** (drop `isOwedToMe`, merge accounts by name,
+     `isCharge`→`isGiven` where `isGiven = (old isOwedToMe == old isCharge)`; full table rebuilds,
+     schema v10). Both entities `@Serializable` + in `MoneyManagerExport` (`debts`/`debtEntries`,
+     defaulted empty, `CURRENT_SCHEMA_VERSION` still 1) with `sqlite_sequence` resync.
+   - **Optional due-date reminder** (`DebtReminderScheduler`/`DebtReminderReceiver`, channel
+     `debt_reminders` + `DEBT_NOTIFICATION_TAG`; text/amount from the signed `DebtDao.getBalance`).
+     Rescheduled on boot alongside EMIs.
+
+10. **Savings pots** (`ui/saving/`, 5th bottom-nav tab `Destination.Savings`). A `Saving` with an
+    **optional** `targetAmount` goal, paid into by ad-hoc `SavingContribution`s of varying amounts
+    (`SavingRepository`/`SavingWithProgress`: `totalSaved` = Σ contributions, `progress`/`remaining`
+    /`isAchieved` are null/false when there's no target). List has a "Total saved" header + per-pot
+    cards (progress bar only when a goal is set); detail is a contributions ledger with a full-width
+    "Add to savings" button and Snackbar-undo on delete (mirrors the debt/EMI ledger pattern). No
+    reminders (savings have no due dates). New entities `Saving`/`SavingContribution` via
+    **`MIGRATION_11_12`** (schema v12), `@Serializable` + in `MoneyManagerExport`
+    (`savings`/`savingContributions`, defaulted empty) with `sqlite_sequence` resync. This is the
+    built version of the old "Desires / bucket list" idea below.
+
 ### 🔲 To Build
 
-9. **Desires (Bucket List)**
+9. **Desires (Bucket List)** — superseded by the **Savings pots** feature above (built); keep only
+   if a distinct "wish list" (separate from savings) is ever wanted.
    - Add desire: name, target amount
    - Track saved amount toward each desire (add contribution over time, like a mini savings goal)
    - Progress bar per desire (saved / target)
@@ -435,24 +484,6 @@ without being asked. Everything else is planned but not yet built.
     - Shows: next EMI due (name, amount, due date)
     - Refresh via `WorkManager` periodic worker (simplest) or a `ContentObserver`/`Flow` bridge for live updates
     - Depends on EMI module data only
-
-13. **Personal Debt Ledger ("who owes whom")** — *low priority, requested 2026-07-03*
-    - Informal person-to-person debts (money lent to / borrowed from friends & family), distinct
-      from the formal `Emi` module. Use case in the user's words: "1000 rs debt to my friend, told
-      them I'll give 1000 next month (notify); sometimes I give 500 only, so minus 500… so we don't
-      forget it."
-    - Each debt has: a person/name, a direction (I owe them **vs** they owe me), an original amount,
-      an optional due date, and a **running outstanding balance** that starts at the original amount
-    - **Partial payments** reduce the outstanding balance (₹1000 → pay ₹500 → ₹500 remaining), tracked
-      as a list of payment entries per debt (mirror the `Emi`/`EmiPayment` parent-child shape so the
-      "sum of payments vs total" logic and undo patterns can be reused). Auto-mark settled when the
-      balance hits 0
-    - **Due-date reminder** via the existing `AlarmManager` + `NotificationHelper` path — reuse
-      `EmiReminderScheduler`'s inexact-alarm pattern rather than adding a new scheduler
-    - New Room entities (`Debt`, `DebtPayment`) → **new migration + version bump**, and include them in
-      the Backup/Restore `MoneyManagerExport` snapshot (add `@Serializable`, extend import/export +
-      the `sqlite_sequence` resync). A Home summary line ("You are owed ₹X / You owe ₹Y") is optional
-      follow-up, gated behind its own `HomeSection` toggle
 
 ---
 

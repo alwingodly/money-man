@@ -30,6 +30,8 @@ class ExpenseRepository @Inject constructor(
 
     fun getRecentExpenses(limit: Int): Flow<List<Expense>> = expenseDao.getRecentExpenses(limit)
 
+    fun getAllExpenses(): Flow<List<Expense>> = expenseDao.getAllExpenses()
+
     fun searchExpenses(query: String): Flow<List<Expense>> = expenseDao.searchExpenses(query.trim())
 
     fun getExpenseTotalForPeriodByPaymentMethod(

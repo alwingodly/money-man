@@ -2,15 +2,22 @@ package com.alwin.moneymanager.data.repository
 
 import com.alwin.moneymanager.data.local.dao.EmiDao
 import com.alwin.moneymanager.data.local.entity.Emi
+import com.alwin.moneymanager.data.local.entity.EmiFrequency
 import com.alwin.moneymanager.data.local.entity.EmiPayment
 import com.alwin.moneymanager.reminder.EmiReminderScheduler
-import com.alwin.moneymanager.util.addMonths
+import com.alwin.moneymanager.util.emiEndDate
+import com.alwin.moneymanager.util.installmentDueDate
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -28,7 +35,7 @@ data class EmiWithProgress(
 
     /** Due date of the next unpaid installment, or null if every month is already paid. */
     val nextDueDateMillis: Long?
-        get() = if (paidMonths < emi.totalMonths) addMonths(emi.startDateMillis, paidMonths) else null
+        get() = if (paidMonths < emi.totalMonths) installmentDueDate(emi, paidMonths) else null
 
     val totalPayable: Double get() = emi.monthlyAmount * emi.totalMonths
 
@@ -36,9 +43,49 @@ data class EmiWithProgress(
      * entered (0 = unknown, not a real zero-interest loan) — see [Emi.loanAmount]. */
     val totalInterest: Double?
         get() = if (emi.loanAmount > 0) totalPayable - emi.loanAmount else null
+
+    /** Sum of every late-payment fine recorded against this EMI. */
+    val totalPenalty: Double get() = payments.sumOf { it.penaltyAmount }
+
+    /** Installment numbers that carry a late-payment penalty (shown red in the grid). */
+    val penalizedMonths: Set<Int>
+        get() = payments.filter { it.penaltyAmount > 0 }.map { it.monthNumber }.toSet()
 }
 
 data class EmiMonthSummary(val paidAmount: Double, val dueAmount: Double)
+
+/** Total EMI outgoing (sum of installment amounts due) for a single calendar month / year. */
+data class EmiMonthlyTotal(val year: Int, val month: Int, val amount: Double)
+data class EmiYearlyTotal(val year: Int, val amount: Double)
+
+data class EmiPeriodTotals(
+    val months: List<EmiMonthlyTotal>, // most recent first
+    val years: List<EmiYearlyTotal>,   // most recent first
+)
+
+/**
+ * Buckets every installment of every EMI by the calendar month/year it falls due, summing the
+ * installment amount into each — so daily/weekly loans roll up into their month, and a month with
+ * several loans shows the combined outgoing. Backs the "Monthly & yearly totals" view.
+ */
+fun List<EmiWithProgress>.periodTotals(zone: ZoneId = ZoneId.systemDefault()): EmiPeriodTotals {
+    val byMonth = HashMap<Pair<Int, Int>, Double>()
+    forEach { ewp ->
+        val emi = ewp.emi
+        for (index in 0 until emi.totalMonths) {
+            val due = Instant.ofEpochMilli(installmentDueDate(emi, index)).atZone(zone)
+            val key = due.year to due.monthValue
+            byMonth[key] = (byMonth[key] ?: 0.0) + emi.monthlyAmount
+        }
+    }
+    val months = byMonth.entries
+        .map { EmiMonthlyTotal(it.key.first, it.key.second, it.value) }
+        .sortedWith(compareByDescending<EmiMonthlyTotal> { it.year }.thenByDescending { it.month })
+    val years = months.groupBy { it.year }
+        .map { (year, list) -> EmiYearlyTotal(year, list.sumOf { it.amount }) }
+        .sortedByDescending { it.year }
+    return EmiPeriodTotals(months, years)
+}
 
 /**
  * Sum of `monthlyAmount` for every installment whose *due date* (not paid date) falls in
@@ -49,7 +96,7 @@ data class EmiMonthSummary(val paidAmount: Double, val dueAmount: Double)
 fun List<EmiWithProgress>.paidAmountInRange(startMillis: Long, endMillis: Long): Double =
     sumOf { emiWithProgress ->
         val count = emiWithProgress.payments.count { payment ->
-            val dueDateMillis = addMonths(emiWithProgress.emi.startDateMillis, payment.monthNumber - 1)
+            val dueDateMillis = installmentDueDate(emiWithProgress.emi, payment.monthNumber - 1)
             dueDateMillis in startMillis until endMillis
         }
         count * emiWithProgress.emi.monthlyAmount
@@ -72,14 +119,27 @@ class EmiRepository @Inject constructor(
     private val emiDao: EmiDao,
     private val reminderScheduler: EmiReminderScheduler,
 ) {
-    fun getAllEmisWithProgress(): Flow<List<EmiWithProgress>> =
-        emiDao.getAllEmis().flatMapLatest { emis ->
-            if (emis.isEmpty()) {
-                flowOf(emptyList())
-            } else {
-                combine(emis.map { emi -> emiWithProgressFlow(emi) }) { it.toList() }
+    // App-scoped: this @Singleton lives for the whole process, so its scope does too. Backs the
+    // shared EMI stream below.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    // One payments query per loan (an N+1 fan-out) rebuilt from scratch by every collector adds up:
+    // Home alone watches this via both the summary and the active-loans preview, and the EMI screen
+    // via its list/closed/totals views. shareIn collapses all concurrent collectors onto a single
+    // upstream fan-out; WhileSubscribed(5000) tears it down shortly after the last screen leaves,
+    // and replay = 1 hands the latest snapshot to the next subscriber without a reload flash.
+    private val allEmisWithProgress: Flow<List<EmiWithProgress>> =
+        emiDao.getAllEmis()
+            .flatMapLatest { emis ->
+                if (emis.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    combine(emis.map { emi -> emiWithProgressFlow(emi) }) { it.toList() }
+                }
             }
-        }
+            .shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 1)
+
+    fun getAllEmisWithProgress(): Flow<List<EmiWithProgress>> = allEmisWithProgress
 
     fun getEmiWithProgress(emiId: Long): Flow<EmiWithProgress?> =
         emiDao.getEmiById(emiId).flatMapLatest { emi ->
@@ -109,23 +169,30 @@ class EmiRepository @Inject constructor(
         monthlyAmount: Double,
         totalMonths: Int,
         startDateMillis: Long,
-        endDateMillis: Long,
         notes: String,
         notificationEnabled: Boolean,
         reminderDaysBefore: Int,
         loanAmount: Double,
+        frequency: EmiFrequency,
+        offDaysMask: Int,
+        intervalDays: Int,
     ) {
-        val emi = Emi(
+        val base = Emi(
             name = name,
             monthlyAmount = monthlyAmount,
             totalMonths = totalMonths,
             startDateMillis = startDateMillis,
-            endDateMillis = endDateMillis,
             notes = notes,
             notificationEnabled = notificationEnabled,
             reminderDaysBefore = reminderDaysBefore,
             loanAmount = loanAmount,
+            frequency = frequency,
+            offDaysMask = offDaysMask,
+            intervalDays = intervalDays,
         )
+        // End date derived from the schedule so weekly/daily (and daily off-day skipping) land it
+        // on the real final installment instead of the caller having to reproduce that math.
+        val emi = base.copy(endDateMillis = emiEndDate(base, totalMonths))
         val id = emiDao.insertEmi(emi)
         reminderScheduler.scheduleReminder(emi.copy(id = id), paidMonths = 0)
     }
@@ -136,23 +203,28 @@ class EmiRepository @Inject constructor(
         monthlyAmount: Double,
         totalMonths: Int,
         startDateMillis: Long,
-        endDateMillis: Long,
         notes: String,
         notificationEnabled: Boolean,
         reminderDaysBefore: Int,
         loanAmount: Double,
+        frequency: EmiFrequency,
+        offDaysMask: Int,
+        intervalDays: Int,
     ) {
-        val updated = emi.copy(
+        val base = emi.copy(
             name = name,
             monthlyAmount = monthlyAmount,
             totalMonths = totalMonths,
             startDateMillis = startDateMillis,
-            endDateMillis = endDateMillis,
             notes = notes,
             notificationEnabled = notificationEnabled,
             reminderDaysBefore = reminderDaysBefore,
             loanAmount = loanAmount,
+            frequency = frequency,
+            offDaysMask = offDaysMask,
+            intervalDays = intervalDays,
         )
+        val updated = base.copy(endDateMillis = emiEndDate(base, totalMonths))
         emiDao.updateEmi(updated)
         val paidMonths = emiDao.getPaidMonthCount(updated.id)
         reminderScheduler.scheduleReminder(updated, paidMonths)
@@ -163,14 +235,18 @@ class EmiRepository @Inject constructor(
         reminderScheduler.cancelReminder(emi.id)
     }
 
-    /** Returns true if this payment was the final installment, completing the loan. */
-    suspend fun markNextMonthPaid(emi: Emi, paidMonths: Int): Boolean {
+    /**
+     * Records the next installment as paid. [penaltyAmount] is the late fine the user entered when
+     * paying after the due date (0 when on time). Returns true if this was the final installment.
+     */
+    suspend fun markNextMonthPaid(emi: Emi, paidMonths: Int, penaltyAmount: Double = 0.0): Boolean {
         val nextMonth = paidMonths + 1
         val insertedId = emiDao.insertPayment(
             EmiPayment(
                 emiId = emi.id,
                 monthNumber = nextMonth,
                 paidDateMillis = System.currentTimeMillis(),
+                penaltyAmount = penaltyAmount,
             )
         )
         // -1 means this installment was already recorded (duplicate ignored) — don't re-run the

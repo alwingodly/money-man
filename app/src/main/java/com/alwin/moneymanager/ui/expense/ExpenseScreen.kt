@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CreditCard
@@ -82,6 +83,7 @@ private val granularities = listOf(
 fun ExpenseScreen(
     onDateSelected: (Long) -> Unit,
     onSearchClick: () -> Unit,
+    onSummaryClick: () -> Unit,
     viewModel: ExpenseViewModel = hiltViewModel(),
 ) {
     var showAddExpenseDialog by remember { mutableStateOf(false) }
@@ -120,6 +122,9 @@ fun ExpenseScreen(
             TopAppBar(
                 title = { Text("Expenses") },
                 actions = {
+                    IconButton(onClick = onSummaryClick) {
+                        Icon(Icons.Filled.BarChart, contentDescription = "Monthly and yearly summary")
+                    }
                     IconButton(onClick = onSearchClick) {
                         Icon(Icons.Filled.Search, contentDescription = "Search expenses")
                     }

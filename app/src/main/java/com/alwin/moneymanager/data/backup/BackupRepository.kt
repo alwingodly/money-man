@@ -4,10 +4,13 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.alwin.moneymanager.data.local.MoneyManagerDatabase
+import com.alwin.moneymanager.data.local.dao.DebtDao
 import com.alwin.moneymanager.data.local.dao.EmiDao
 import com.alwin.moneymanager.data.local.dao.ExpenseCategoryDao
 import com.alwin.moneymanager.data.local.dao.ExpenseDao
+import com.alwin.moneymanager.data.local.dao.SavingDao
 import com.alwin.moneymanager.data.repository.BackupReminderRepository
+import com.alwin.moneymanager.reminder.DebtReminderScheduler
 import com.alwin.moneymanager.reminder.EmiReminderScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +28,10 @@ class BackupRepository @Inject constructor(
     private val emiDao: EmiDao,
     private val expenseDao: ExpenseDao,
     private val expenseCategoryDao: ExpenseCategoryDao,
+    private val debtDao: DebtDao,
+    private val savingDao: SavingDao,
     private val reminderScheduler: EmiReminderScheduler,
+    private val debtReminderScheduler: DebtReminderScheduler,
     private val backupReminderRepository: BackupReminderRepository,
     @ApplicationContext private val context: Context,
 ) {
@@ -38,6 +44,10 @@ class BackupRepository @Inject constructor(
             emiPayments = emiDao.getAllPaymentsSnapshot(),
             expenseCategories = expenseCategoryDao.getAllCategoriesSnapshot(),
             expenses = expenseDao.getAllExpensesSnapshot(),
+            debts = debtDao.getAllDebtsSnapshot(),
+            debtEntries = debtDao.getAllEntriesSnapshot(),
+            savings = savingDao.getAllSavingsSnapshot(),
+            savingContributions = savingDao.getAllContributionsSnapshot(),
         )
         val content = json.encodeToString(export)
         context.contentResolver.openOutputStream(uri)?.use { output ->
@@ -62,14 +72,21 @@ class BackupRepository @Inject constructor(
         }
 
         val previousEmiIds = emiDao.getAllEmisSnapshot().map { it.id }
+        val previousDebtIds = debtDao.getAllDebtsSnapshot().map { it.id }
 
         database.withTransaction {
             emiDao.deleteAllEmis()
             expenseCategoryDao.deleteAllCategories()
+            debtDao.deleteAllDebts()
+            savingDao.deleteAllSavings()
             expenseCategoryDao.insertCategories(export.expenseCategories)
             emiDao.insertEmis(export.emis)
             expenseDao.insertExpenses(export.expenses)
             emiDao.insertPayments(export.emiPayments)
+            debtDao.insertDebts(export.debts)
+            debtDao.insertEntries(export.debtEntries)
+            savingDao.insertSavings(export.savings)
+            savingDao.insertContributions(export.savingContributions)
             resyncAutoIncrementCounters()
         }
 
@@ -77,6 +94,11 @@ class BackupRepository @Inject constructor(
         export.emis.filter { it.notificationEnabled && !it.isCompleted }.forEach { emi ->
             val paidMonths = emiDao.getPaidMonthCount(emi.id)
             reminderScheduler.scheduleReminder(emi, paidMonths)
+        }
+
+        previousDebtIds.forEach { debtReminderScheduler.cancelReminder(it) }
+        export.debts.filter { it.notificationEnabled && !it.isSettled }.forEach { debt ->
+            debtReminderScheduler.scheduleReminder(debt)
         }
     }
 
@@ -88,7 +110,10 @@ class BackupRepository @Inject constructor(
      */
     private fun resyncAutoIncrementCounters() {
         val db = database.openHelper.writableDatabase
-        listOf("emi", "emi_payment", "expense", "expense_category").forEach { table ->
+        listOf(
+            "emi", "emi_payment", "expense", "expense_category",
+            "debt", "debt_entry", "saving", "saving_contribution",
+        ).forEach { table ->
             db.execSQL(
                 "INSERT OR REPLACE INTO sqlite_sequence(name, seq) " +
                     "VALUES('$table', (SELECT COALESCE(MAX(id), 0) FROM $table))"

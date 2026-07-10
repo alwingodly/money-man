@@ -16,6 +16,7 @@ local.properties
 *.jks
 *.keystore
 key.properties
+keystore.properties
 
 # Build artifacts (normally under build/, but just in case)
 *.apk

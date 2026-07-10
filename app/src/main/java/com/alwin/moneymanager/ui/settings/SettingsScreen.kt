@@ -64,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.HomeSection
 import com.alwin.moneymanager.ui.applock.AppLockViewModel
 import com.alwin.moneymanager.ui.home.HomeSectionsViewModel
+import com.alwin.moneymanager.ui.navigation.NavTabsViewModel
 import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
 import com.alwin.moneymanager.ui.theme.AppThemeColor
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
@@ -81,7 +82,10 @@ fun SettingsScreen(
     currencyViewModel: CurrencyViewModel = hiltViewModel(),
     backupViewModel: BackupViewModel = hiltViewModel(),
     onboardingViewModel: OnboardingViewModel = hiltViewModel(),
+    navTabsViewModel: NavTabsViewModel = hiltViewModel(),
 ) {
+    val showDebtsTab by navTabsViewModel.showDebts.collectAsState()
+    val showSavingsTab by navTabsViewModel.showSavings.collectAsState()
     val isAppLockEnabled by appLockViewModel.isAppLockEnabled.collectAsState()
     val lockOnBackground by appLockViewModel.lockOnBackground.collectAsState()
     val isBackupWorking by backupViewModel.isWorking.collectAsState()
@@ -162,6 +166,22 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 CurrencyPicker(currencyViewModel)
+            }
+
+            SettingsSection(title = "Bottom tabs", icon = Icons.Filled.Dashboard) {
+                SettingRow(
+                    title = "Debts tab",
+                    subtitle = "Show the Debts tab in the bottom bar",
+                    checked = showDebtsTab,
+                    onCheckedChange = { navTabsViewModel.setShowDebts(it) },
+                )
+                SettingDivider()
+                SettingRow(
+                    title = "Savings tab",
+                    subtitle = "Show the Savings tab in the bottom bar",
+                    checked = showSavingsTab,
+                    onCheckedChange = { navTabsViewModel.setShowSavings(it) },
+                )
             }
 
             SettingsSection(title = "Customize Home", icon = Icons.Filled.Dashboard) {

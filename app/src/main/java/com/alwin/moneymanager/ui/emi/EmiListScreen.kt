@@ -47,8 +47,10 @@ fun EmiListScreen(
 ) {
     val emiList by viewModel.emiList.collectAsState()
     val monthSummary by viewModel.monthSummary.collectAsState()
+    val periodTotals by viewModel.periodTotals.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var showTotals by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -72,6 +74,13 @@ fun EmiListScreen(
                             Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Monthly & yearly totals") },
+                                onClick = {
+                                    menuExpanded = false
+                                    showTotals = true
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Closed loans") },
                                 onClick = {
@@ -119,6 +128,10 @@ fun EmiListScreen(
                 showAddDialog = false
             },
         )
+    }
+
+    if (showTotals) {
+        EmiTotalsDialog(totals = periodTotals, onDismiss = { showTotals = false })
     }
 }
 

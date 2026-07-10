@@ -1,5 +1,6 @@
 package com.alwin.moneymanager.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -30,4 +31,8 @@ data class EmiPayment(
     val emiId: Long,
     val monthNumber: Int,
     val paidDateMillis: Long,
+    /** Late-payment fine the user entered when marking this installment paid after its due date.
+     * 0 = paid on time, or no penalty charged. */
+    @ColumnInfo(defaultValue = "0")
+    val penaltyAmount: Double = 0.0,
 )

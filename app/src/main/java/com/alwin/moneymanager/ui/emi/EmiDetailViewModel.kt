@@ -30,14 +30,14 @@ class EmiDetailViewModel @Inject constructor(
     // round-trip and any UI flicker.
     private var isMarkingPaid = false
 
-    fun markNextMonthPaid(onCompleted: () -> Unit) {
+    fun markNextMonthPaid(penaltyAmount: Double = 0.0, onCompleted: () -> Unit) {
         val current = emiWithProgress.value ?: return
         if (current.paidMonths >= current.emi.totalMonths) return
         if (isMarkingPaid) return
         isMarkingPaid = true
         viewModelScope.launch {
             try {
-                val justCompleted = repository.markNextMonthPaid(current.emi, current.paidMonths)
+                val justCompleted = repository.markNextMonthPaid(current.emi, current.paidMonths, penaltyAmount)
                 if (justCompleted) onCompleted()
             } finally {
                 isMarkingPaid = false
@@ -54,11 +54,13 @@ class EmiDetailViewModel @Inject constructor(
                 monthlyAmount = form.monthlyAmount,
                 totalMonths = form.totalMonths,
                 startDateMillis = form.startDateMillis,
-                endDateMillis = form.endDateMillis,
                 notes = form.notes,
                 notificationEnabled = form.notificationEnabled,
                 reminderDaysBefore = form.reminderDaysBefore,
                 loanAmount = form.loanAmount,
+                frequency = form.frequency,
+                offDaysMask = form.offDaysMask,
+                intervalDays = form.intervalDays,
             )
         }
     }

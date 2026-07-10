@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,15 +50,25 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.alwin.moneymanager.data.local.entity.EmiFrequency
 import com.alwin.moneymanager.data.repository.EmiWithProgress
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
-import com.alwin.moneymanager.util.addMonths
+import com.alwin.moneymanager.util.currentCurrency
 import com.alwin.moneymanager.util.formatCurrency
+import com.alwin.moneymanager.util.installmentDueDate
+import com.alwin.moneymanager.util.isPaidLate
 import com.alwin.moneymanager.util.shortMonthYearLabel
 import java.text.DateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
+
+/** Day-of-month + short month, two lines, for weekly/daily installment cells. */
+private val cellDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d\nMMM")
 
 @Composable
 fun EmiDetailScreen(
@@ -70,6 +82,8 @@ fun EmiDetailScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showCongrats by remember { mutableStateOf(false) }
     var showUndoReopenWarning by remember { mutableStateOf(false) }
+    var showPenaltyPrompt by remember { mutableStateOf(false) }
+    var penaltyText by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -102,13 +116,22 @@ fun EmiDetailScreen(
             // The date parsing/formatting is the expensive part; doing it here (keyed on the data)
             // instead of inside each cell keeps it off the scroll path, so scrolling stays smooth
             // even on long loans. The whole screen is then one LazyColumn; the action bar is pinned.
-            val monthRows = remember(current.emi.startDateMillis, current.emi.totalMonths, current.payments) {
+            val monthRows = remember(current.emi, current.payments) {
+                val emi = current.emi
                 val paid = current.payments.map { it.monthNumber }.toSet()
-                (1..current.emi.totalMonths).map { month ->
+                val penalized = current.penalizedMonths
+                (1..emi.totalMonths).map { month ->
+                    val dueMillis = installmentDueDate(emi, month - 1)
                     MonthCellData(
                         monthNumber = month,
-                        label = shortMonthYearLabel(addMonths(current.emi.startDateMillis, month - 1)),
+                        // Monthly cells read best as "MMM / yyyy"; weekly/daily need the day-of-month.
+                        label = if (emi.frequency == EmiFrequency.MONTHLY) {
+                            shortMonthYearLabel(dueMillis)
+                        } else {
+                            cellDayFormatter.format(Instant.ofEpochMilli(dueMillis).atZone(ZoneId.systemDefault()))
+                        },
                         isPaid = paid.contains(month),
+                        isPenalized = penalized.contains(month),
                     )
                 }.chunked(6)
             }
@@ -181,11 +204,18 @@ fun EmiDetailScreen(
                     Button(
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.markNextMonthPaid(onCompleted = { showCongrats = true })
+                            // Paying after the installment's due day? Ask about a late penalty first.
+                            val nextDue = installmentDueDate(current.emi, current.paidMonths)
+                            if (isPaidLate(nextDue, System.currentTimeMillis())) {
+                                penaltyText = ""
+                                showPenaltyPrompt = true
+                            } else {
+                                viewModel.markNextMonthPaid(onCompleted = { showCongrats = true })
+                            }
                         },
                         enabled = current.paidMonths < current.emi.totalMonths,
                         modifier = Modifier.weight(1f),
-                    ) { Text("Mark next month paid") }
+                    ) { Text("Mark next ${current.emi.frequency.unitSingular} paid") }
                 }
             }
         }
@@ -204,6 +234,46 @@ fun EmiDetailScreen(
     }
 
     val current = item
+    if (showPenaltyPrompt && current != null) {
+        val nextDue = installmentDueDate(current.emi, current.paidMonths)
+        val dueLabel = remember(nextDue) { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(nextDue)) }
+        val penaltyValue = penaltyText.toDoubleOrNull()
+        AlertDialog(
+            onDismissRequest = { showPenaltyPrompt = false },
+            title = { Text("Paid after due date") },
+            text = {
+                Column {
+                    Text("This ${current.emi.frequency.unitSingular} was due on $dueLabel. Any late penalty or fine charged?")
+                    OutlinedTextField(
+                        value = penaltyText,
+                        onValueChange = { penaltyText = it },
+                        label = { Text("Penalty amount") },
+                        prefix = { Text(currentCurrency.symbol) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = penaltyValue != null && penaltyValue > 0,
+                    onClick = {
+                        viewModel.markNextMonthPaid(penaltyValue ?: 0.0, onCompleted = { showCongrats = true })
+                        showPenaltyPrompt = false
+                    },
+                ) { Text("Add penalty") }
+            },
+            dismissButton = {
+                // Late, but no fine charged — record the payment on time-less-penalty.
+                TextButton(onClick = {
+                    viewModel.markNextMonthPaid(0.0, onCompleted = { showCongrats = true })
+                    showPenaltyPrompt = false
+                }) { Text("No penalty") }
+            },
+        )
+    }
+
     if (showEditDialog && current != null) {
         EmiFormDialog(
             title = "Edit EMI",
@@ -215,6 +285,10 @@ fun EmiDetailScreen(
             initialNotificationEnabled = current.emi.notificationEnabled,
             initialReminderDaysBefore = current.emi.reminderDaysBefore,
             initialLoanAmount = if (current.emi.loanAmount > 0) current.emi.loanAmount.toString() else "",
+            initialFrequency = current.emi.frequency,
+            initialTotalCount = current.emi.totalMonths,
+            initialOffDaysMask = current.emi.offDaysMask,
+            initialIntervalDays = current.emi.intervalDays,
             minTotalMonths = maxOf(1, current.paidMonths),
             onDismiss = { showEditDialog = false },
             onConfirm = { form ->
@@ -268,7 +342,7 @@ private fun EmiOverviewCard(item: EmiWithProgress, dateFormat: DateFormat) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    OverviewStat(label = "Monthly amount", value = formatCurrency(item.emi.monthlyAmount))
+                    OverviewStat(label = item.emi.frequency.amountLabel, value = formatCurrency(item.emi.monthlyAmount))
                     Spacer(Modifier.height(14.dp))
                     OverviewStat(label = "Remaining", value = formatCurrency(item.remainingAmount))
                 }
@@ -310,6 +384,16 @@ private fun EmiOverviewCard(item: EmiWithProgress, dateFormat: DateFormat) {
                 DetailRow(
                     label = "Total interest",
                     value = formatCurrency(interest),
+                    valueColor = MaterialTheme.colorScheme.error,
+                    emphasize = true,
+                )
+            }
+
+            if (item.totalPenalty > 0) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
+                DetailRow(
+                    label = "Penalties paid",
+                    value = formatCurrency(item.totalPenalty),
                     valueColor = MaterialTheme.colorScheme.error,
                     emphasize = true,
                 )
@@ -361,19 +445,21 @@ private data class MonthCellData(
     val monthNumber: Int,
     val label: String,
     val isPaid: Boolean,
+    val isPenalized: Boolean = false,
 )
 
 @Composable
 private fun MonthCell(cell: MonthCellData, modifier: Modifier = Modifier) {
-    val backgroundColor = if (cell.isPaid) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+    // Installments paid with a penalty are red so a fined payment stands out at a glance.
+    val backgroundColor = when {
+        cell.isPenalized -> MaterialTheme.colorScheme.error
+        cell.isPaid -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
-    val contentColor = if (cell.isPaid) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor = when {
+        cell.isPenalized -> MaterialTheme.colorScheme.onError
+        cell.isPaid -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Box(
         modifier = modifier

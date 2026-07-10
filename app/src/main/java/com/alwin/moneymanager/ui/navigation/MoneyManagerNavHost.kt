@@ -10,8 +10,10 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -20,21 +22,44 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.alwin.moneymanager.ui.debt.DebtDetailScreen
+import com.alwin.moneymanager.ui.debt.DebtHistoryScreen
+import com.alwin.moneymanager.ui.debt.DebtListScreen
 import com.alwin.moneymanager.ui.emi.EmiClosedListScreen
 import com.alwin.moneymanager.ui.emi.EmiDetailScreen
 import com.alwin.moneymanager.ui.emi.EmiListScreen
 import com.alwin.moneymanager.ui.expense.DayDetailScreen
 import com.alwin.moneymanager.ui.expense.ExpenseScreen
 import com.alwin.moneymanager.ui.expense.ExpenseSearchScreen
+import com.alwin.moneymanager.ui.expense.ExpenseSummaryScreen
 import com.alwin.moneymanager.ui.home.HomeScreen
 import com.alwin.moneymanager.ui.profile.ProfileScreen
+import com.alwin.moneymanager.ui.saving.SavingDetailScreen
+import com.alwin.moneymanager.ui.saving.SavingListScreen
 import com.alwin.moneymanager.ui.settings.SettingsScreen
 
 @Composable
-fun MoneyManagerNavHost() {
+fun MoneyManagerNavHost(
+    navTabsViewModel: NavTabsViewModel = hiltViewModel(),
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+
+    // Debts and Savings tabs are optional (toggled in Settings); Home/EMIs/Expenses are always on.
+    val showDebts by navTabsViewModel.showDebts.collectAsState()
+    val showSavings by navTabsViewModel.showSavings.collectAsState()
+    val visibleTabs = topLevelDestinations.filter { tab ->
+        when (tab.destination) {
+            Destination.Debts -> showDebts
+            Destination.Savings -> showSavings
+            else -> true
+        }
+    }
+
+    // The bottom bar shows only on top-level tab screens. Detection uses the full tab list (not the
+    // filtered one) so the bar still appears if you reach a hidden tab from elsewhere.
+    val showBottomBar = currentDestination?.route in topLevelDestinations.map { it.destination.route }
 
     Scaffold(
         // No topBar here — each screen has its own TopAppBar which already pads for the
@@ -42,32 +67,34 @@ fun MoneyManagerNavHost() {
         // status bar height into innerPadding and every screen ends up padded for it twice.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            NavigationBar {
-                topLevelDestinations.forEach { topLevel ->
-                    val selected = currentDestination?.hierarchy?.any {
-                        it.route == topLevel.destination.route
-                    } == true
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = {
-                            navController.navigate(topLevel.destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (showBottomBar) {
+                NavigationBar {
+                    visibleTabs.forEach { topLevel ->
+                        val selected = currentDestination?.hierarchy?.any {
+                            it.route == topLevel.destination.route
+                        } == true
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(topLevel.destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
-                        label = { Text(topLevel.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    )
+                            },
+                            icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
+                            label = { Text(topLevel.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                    }
                 }
             }
         }
@@ -126,7 +153,11 @@ fun MoneyManagerNavHost() {
                         navController.navigate(Destination.ExpenseDayDetail.createRoute(dateMillis))
                     },
                     onSearchClick = { navController.navigate(Destination.ExpenseSearch.route) },
+                    onSummaryClick = { navController.navigate(Destination.ExpenseSummary.route) },
                 )
+            }
+            composable(Destination.ExpenseSummary.route) {
+                ExpenseSummaryScreen(onBack = { navController.popBackStack() })
             }
             composable(Destination.ExpenseSearch.route) {
                 ExpenseSearchScreen(
@@ -143,6 +174,45 @@ fun MoneyManagerNavHost() {
                 ),
             ) {
                 DayDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Destination.Debts.route) {
+                DebtListScreen(
+                    onDebtClick = { debtId ->
+                        navController.navigate(Destination.DebtDetail.createRoute(debtId))
+                    },
+                    onHistoryClick = { navController.navigate(Destination.DebtHistory.route) },
+                )
+            }
+            composable(Destination.DebtHistory.route) {
+                DebtHistoryScreen(
+                    onBack = { navController.popBackStack() },
+                    onDebtClick = { debtId ->
+                        navController.navigate(Destination.DebtDetail.createRoute(debtId))
+                    },
+                )
+            }
+            composable(
+                route = Destination.DebtDetail.route,
+                arguments = listOf(
+                    navArgument(Destination.DebtDetail.ARG_DEBT_ID) { type = NavType.LongType }
+                ),
+            ) {
+                DebtDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Destination.Savings.route) {
+                SavingListScreen(
+                    onSavingClick = { savingId ->
+                        navController.navigate(Destination.SavingDetail.createRoute(savingId))
+                    },
+                )
+            }
+            composable(
+                route = Destination.SavingDetail.route,
+                arguments = listOf(
+                    navArgument(Destination.SavingDetail.ARG_SAVING_ID) { type = NavType.LongType }
+                ),
+            ) {
+                SavingDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(Destination.Settings.route) {
                 SettingsScreen(onBack = { navController.popBackStack() })

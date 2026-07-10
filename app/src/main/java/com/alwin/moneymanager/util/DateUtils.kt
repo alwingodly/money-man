@@ -27,6 +27,12 @@ fun addMonths(millis: Long, months: Int): Long =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).plusMonths(months.toLong())
         .toInstant().toEpochMilli()
 
+fun addDays(millis: Long, days: Int): Long =
+    Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).plusDays(days.toLong())
+        .toInstant().toEpochMilli()
+
+fun addWeeks(millis: Long, weeks: Int): Long = addDays(millis, weeks * 7)
+
 fun subtractDays(millis: Long, days: Int): Long =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).minusDays(days.toLong())
         .toInstant().toEpochMilli()
