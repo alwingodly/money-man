@@ -5,6 +5,42 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 private const val MILLIS_PER_MONTH = 30L * 24 * 60 * 60 * 1000
 
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add frequency column to chitti table
+        db.execSQL("ALTER TABLE chitti ADD COLUMN frequency TEXT NOT NULL DEFAULT 'MONTHLY'")
+    }
+}
+
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Chitti tracking: group savings scheme with variable monthly payments
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `chitti` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, " +
+                "`totalMonths` INTEGER NOT NULL, " +
+                "`startDateMillis` INTEGER NOT NULL, " +
+                "`notes` TEXT NOT NULL, " +
+                "`isCompleted` INTEGER NOT NULL, " +
+                "`receivedAmount` REAL DEFAULT NULL, " +
+                "`receivedMonthNumber` INTEGER DEFAULT NULL, " +
+                "`receivedDateMillis` INTEGER DEFAULT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `chitti_payment` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`chittiId` INTEGER NOT NULL, " +
+                "`monthNumber` INTEGER NOT NULL, " +
+                "`amount` REAL NOT NULL, " +
+                "`paidDateMillis` INTEGER NOT NULL, " +
+                "`note` TEXT NOT NULL, " +
+                "FOREIGN KEY(`chittiId`) REFERENCES `chitti`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_chitti_payment_chittiId` ON `chitti_payment` (`chittiId`)")
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Emi: add an explicit end date, backfilled from the existing start date + total months.

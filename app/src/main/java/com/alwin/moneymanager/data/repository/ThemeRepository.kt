@@ -5,8 +5,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.alwin.moneymanager.ui.theme.AppThemeColor
+import com.alwin.moneymanager.ui.theme.AppThemeMode
 import com.alwin.moneymanager.ui.theme.AppThemeStyle
 import com.alwin.moneymanager.ui.theme.appThemeColorFromName
+import com.alwin.moneymanager.ui.theme.appThemeModeFromName
 import com.alwin.moneymanager.ui.theme.appThemeStyleFromName
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,6 +17,7 @@ import javax.inject.Singleton
 
 private val THEME_COLOR_KEY = stringPreferencesKey("theme_color")
 private val THEME_STYLE_KEY = stringPreferencesKey("theme_style")
+private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
 
 @Singleton
 class ThemeRepository @Inject constructor(
@@ -34,5 +37,13 @@ class ThemeRepository @Inject constructor(
 
     suspend fun setThemeStyle(style: AppThemeStyle) {
         dataStore.edit { prefs -> prefs[THEME_STYLE_KEY] = style.name }
+    }
+
+    val themeMode: Flow<AppThemeMode> = dataStore.data.map { prefs ->
+        appThemeModeFromName(prefs[THEME_MODE_KEY])
+    }
+
+    suspend fun setThemeMode(mode: AppThemeMode) {
+        dataStore.edit { prefs -> prefs[THEME_MODE_KEY] = mode.name }
     }
 }

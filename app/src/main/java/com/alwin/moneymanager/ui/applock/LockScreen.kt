@@ -44,7 +44,7 @@ fun LockScreen(onUnlock: () -> Unit) {
         }
         errorMessage = null
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Money Manager")
+            .setTitle("Unlock FinBook")
             .setAllowedAuthenticators(AUTHENTICATORS)
             .build()
         val prompt = BiometricPrompt(
@@ -72,7 +72,7 @@ fun LockScreen(onUnlock: () -> Unit) {
             modifier = Modifier.padding(32.dp),
         ) {
             Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.padding(bottom = 8.dp))
-            Text("Money Manager is locked", style = MaterialTheme.typography.titleMedium)
+            Text("FinBook is locked", style = MaterialTheme.typography.titleMedium)
             errorMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
             }

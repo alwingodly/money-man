@@ -2,9 +2,16 @@ package com.alwin.moneymanager.ui.expense
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,6 +32,7 @@ fun AddCategoryDialog(
     existing: ExpenseCategory? = null,
     onDismiss: () -> Unit,
     onConfirm: (name: String, budgetLimit: Double?) -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var budgetText by remember {
@@ -53,6 +61,18 @@ fun AddCategoryDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                
+                if (onDelete != null && existing != null) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.padding(start = 8.dp))
+                        Text("Delete category", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         },
         confirmButton = {

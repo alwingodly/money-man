@@ -28,4 +28,15 @@ interface ExpenseCategoryDao {
     /** Cascades to `expense` via the FK's `ON DELETE CASCADE`. */
     @Query("DELETE FROM expense_category")
     suspend fun deleteAllCategories()
+
+    /** 
+     * Deletes a category and all its expenses (CASCADE).
+     * Returns the number of categories deleted (1 if successful, 0 if not found).
+     */
+    @Query("DELETE FROM expense_category WHERE id = :categoryId")
+    suspend fun deleteCategory(categoryId: Long): Int
+
+    /** Returns the number of expenses in a category. */
+    @Query("SELECT COUNT(*) FROM expense WHERE categoryId = :categoryId")
+    suspend fun getExpenseCount(categoryId: Long): Int
 }

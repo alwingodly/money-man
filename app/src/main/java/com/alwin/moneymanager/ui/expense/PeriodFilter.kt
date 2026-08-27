@@ -40,18 +40,22 @@ fun shiftPeriod(filter: PeriodFilter, delta: Int): Long {
     return shifted.atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
-fun filterByPeriod(expenses: List<Expense>, filter: PeriodFilter): List<Expense> {
-    if (filter.granularity == PeriodGranularity.ALL) return expenses
+fun periodRange(filter: PeriodFilter): Pair<Long, Long>? {
+    if (filter.granularity == PeriodGranularity.ALL) return null
     val date = Instant.ofEpochMilli(filter.referenceMillis).atZone(zone).toLocalDate()
     val (start, endExclusive) = when (filter.granularity) {
         PeriodGranularity.DAY -> date to date.plusDays(1)
         PeriodGranularity.MONTH -> date.withDayOfMonth(1) to date.withDayOfMonth(1).plusMonths(1)
         PeriodGranularity.YEAR -> date.withDayOfYear(1) to date.withDayOfYear(1).plusYears(1)
-        PeriodGranularity.ALL -> return expenses
+        PeriodGranularity.ALL -> return null
     }
-    val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
-    val endMillis = endExclusive.atStartOfDay(zone).toInstant().toEpochMilli()
-    return expenses.filter { it.dateMillis in startMillis until endMillis }
+    return start.atStartOfDay(zone).toInstant().toEpochMilli() to
+        endExclusive.atStartOfDay(zone).toInstant().toEpochMilli()
+}
+
+fun filterByPeriod(expenses: List<Expense>, filter: PeriodFilter): List<Expense> {
+    val range = periodRange(filter) ?: return expenses
+    return expenses.filter { it.dateMillis in range.first until range.second }
 }
 
 private val dayHeaderFormatter = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", Locale.getDefault())

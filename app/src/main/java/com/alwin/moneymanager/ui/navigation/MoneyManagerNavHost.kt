@@ -123,6 +123,9 @@ fun MoneyManagerNavHost(
                     onEmiClick = { emiId ->
                         navController.navigate(Destination.EmiDetail.createRoute(emiId))
                     },
+                    onChittiClick = { chittiId ->
+                        navController.navigate(Destination.ChittiDetail.createRoute(chittiId))
+                    },
                     onClosedLoansClick = { navController.navigate(Destination.EmiClosedList.route) },
                 )
             }
@@ -144,6 +147,19 @@ fun MoneyManagerNavHost(
                     ?: return@composable
                 EmiDetailScreen(
                     emiId = emiId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = Destination.ChittiDetail.route,
+                arguments = listOf(
+                    navArgument(Destination.ChittiDetail.ARG_CHITTI_ID) { type = NavType.LongType }
+                ),
+            ) { backStack ->
+                val chittiId = backStack.arguments?.getLong(Destination.ChittiDetail.ARG_CHITTI_ID)
+                    ?: return@composable
+                com.alwin.moneymanager.ui.emi.ChittiDetailScreen(
+                    chittiId = chittiId,
                     onBack = { navController.popBackStack() },
                 )
             }

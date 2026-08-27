@@ -10,9 +10,11 @@ starting a new module.
 - **Architecture:** MVVM (ViewModel + StateFlow, Room DAOs expose Flow)
 - **DB:** Room (current schema version: 12)
 - **Preferences:** DataStore (Preferences) — used for App Lock settings, Home section
-  visibility, theme color, and profile (name/photo path)
+  visibility, theme color, profile (name/photo path), and Auto backup (on/off + persisted
+  folder/file URIs)
 - **Serialization:** `kotlinx.serialization` (JSON) — used only for the Local Backup/Restore
-  export format; entities are annotated `@Serializable` directly, no separate DTO layer
+  export format (manual export, Auto backup, and later WhatsApp share); entities are annotated
+  `@Serializable` directly, no separate DTO layer
 - **Currency:** Rupee/Dollar/Dinar, user-selectable from Settings (symbol only — see
   `util/AppCurrency.kt`'s `CurrencyType`/`formatCurrency()`/`currentCurrency`, and
   `data/repository/CurrencyRepository.kt` for the DataStore-backed choice). No conversion between
@@ -37,8 +39,9 @@ reminders, loan amount/interest tracking, closed-loan archive, payoff celebratio
 (user-defined categories with day/month/year filtering, daily subtotals, pick-any-date lookup
 that opens a full day-detail page, editable after the fact), a Profile screen (name + photo),
 a curated theme-color picker (shadcn/ui-style neutral surfaces + one accent color, applied
-app-wide), Local Backup/Restore (export/import a full JSON snapshot via Android's file picker),
-App Lock (biometric/PIN), a Rupee/Dollar/Dinar currency picker (symbol-only, no conversion), and
+app-wide), Local Backup/Restore (export/import a full JSON snapshot via Android's file picker,
+plus opt-in Auto backup to a user-chosen folder), App Lock (biometric/PIN), a Rupee/Dollar/Dinar
+currency picker (symbol-only, no conversion), and
 a one-time swipeable onboarding tutorial (Home/EMI/Expenses/Settings, replayable from Settings →
 Help). See "Done" section below. Bank Balance was built and then removed — do not re-add it
 without being asked. Everything else is planned but not yet built.
@@ -254,7 +257,11 @@ without being asked. Everything else is planned but not yet built.
      Savings Account toggle, `Expense.isCreditCard: Boolean`, defaults off = savings), attached to
      the selected category. Credit-card expenses show a small credit-card icon next to the amount
      in the expense list
-   - Delete expense
+   - Delete expense from the edit dialog: tap a row to edit, then **Delete expense** in the
+     form body (below a divider, error-colored, with a trash icon — not in the Cancel/Save
+     action row, which stays the standard two-button Material dialog). Confirmed with
+     `ConfirmDeleteDialog`. Snackbar Undo still appears after a confirmed delete. There is no
+     trash icon on the list — it was too easy to hit by accident.
    - Period filter granularity (All / Day / Month / Year) is chosen from a 3-dot overflow menu
      (`DropdownMenu` behind a `MoreVert` icon) **in the top app bar**, not always-visible segmented
      buttons in the body — the granularity is changed rarely, so it doesn't need permanent screen
@@ -360,17 +367,30 @@ without being asked. Everything else is planned but not yet built.
      navigating away from Home
 
 8. **Local Backup / Restore**
-   - Settings → "Backup & Restore" has two rows: "Export data" and "Import data"
+   - Settings → "Backup & Restore" has Auto backup, "Export data", and "Import data"
      (`ui/settings/SettingsScreen.kt`, backed by `ui/settings/BackupViewModel.kt` and
      `data/backup/BackupRepository.kt`)
    - Export: `ActivityResultContracts.CreateDocument("application/json")` → user picks the save
      location via Android's own file picker (Downloads, a Drive-synced folder, USB storage,
      wherever — no automatic cloud upload) → writes one JSON file
      (`data/backup/MoneyManagerExport.kt`, `kotlinx.serialization`) containing every `Emi`,
-     `EmiPayment`, `ExpenseCategory`, and `Expense` row, with original row `id`s preserved so
-     `EmiPayment.emiId`/`Expense.categoryId` foreign keys still resolve after a restore. Desires
-     aren't in the export yet since that feature doesn't exist; add it to `MoneyManagerExport`
-     when Desires is built
+     `EmiPayment`, `ExpenseCategory`, `Expense`, `Debt`, `DebtEntry`, `Saving`, and
+     `SavingContribution` row, with original row `id`s preserved so foreign keys still resolve
+     after a restore
+   - **Auto backup** (opt-in, local files only — this is **not** Android/Google Auto Backup;
+     `android:allowBackup` stays `false` so financial data is not uploaded to the user's Google
+     account). Toggle in Settings asks for a folder once via
+     `ActivityResultContracts.OpenDocumentTree()` (hinted at Downloads). The tree URI is
+     persisted with `takePersistableUriPermission`. Snapshots are written to
+     `{picked folder}/MoneyManagerBackups/moneymanager-auto-backup.json` using the same
+     `MoneyManagerExport` JSON as manual export (`data/backup/AutoBackupRepository.kt`).
+     `AutoBackupObserver` (registered from `MoneyManagerApp`, `ProcessLifecycleOwner` `ON_STOP`
+     — same lifecycle signal App Lock uses) overwrites that file whenever the app goes to the
+     background. Enabling writes immediately so a file exists before the first backgrounding.
+     Restore is the existing Import path (replace, never merge) — pick that JSON after a
+     reinstall. Private app storage (`Room` / DataStore) is wiped on uninstall; this file is
+     not, which is the point. Do not "fix" this by enabling `allowBackup` or writing into
+     `getExternalFilesDir` (both vanish or restore unreliably for sideloaded builds).
    - Import: `ActivityResultContracts.OpenDocument()` → picks a file → shows a "Replace all
      data?" confirmation (`AlertDialog`, red "Replace" button, matching `ConfirmDeleteDialog`'s
      styling) before doing anything, since this is destructive
@@ -398,8 +418,10 @@ without being asked. Everything else is planned but not yet built.
      to export when it's been 30+ days since their last backup (`BackupReminderRepository` tracks
      `last_backup_millis`/`nudge_dismissed_millis`/`first_use_millis` in DataStore; the clock runs
      from the most recent of those so new users aren't nagged on day one). `BackupRepository.exportTo`
-     calls `recordBackup()` on success; the card only shows when there's actual data to protect
-     (Home has active EMIs or recent activity). "Back up now" routes to Settings, the X snoozes
+     calls `recordBackup()` on success (manual export **and** Auto backup both go through this, so
+     a working Auto backup silences the nudge). The card only shows when there's actual data to
+     protect (Home has active EMIs or recent activity). "Back up now" routes to Settings, the X
+     snoozes
 
 8. **Expense Search** (`ui/expense/ExpenseSearchScreen.kt`, reached via the search icon in the
    Expenses top bar → `Destination.ExpenseSearch`). Debounced free-text search over note text,
@@ -674,8 +696,10 @@ Profile                          // needed for WhatsApp import / multi-person vi
   than passing the selected item through a shared ViewModel field.
 - **Any small piece of persisted user preference (a flag, an enum choice, a short string) is a
   DataStore-backed `XxxRepository` + `XxxViewModel` pair, not a Room table.** Home section
-  visibility (`HomeSectionsRepository`), theme color (`ThemeRepository`), and profile name/photo
-  path (`ProfileRepository`) all follow this shape: a `Singleton` repository wrapping
+  visibility (`HomeSectionsRepository`), theme color (`ThemeRepository`), profile name/photo
+  path (`ProfileRepository`), and Auto backup on/off + folder URIs (`AutoBackupRepository`,
+  surfaced through the existing `BackupViewModel` rather than a second ViewModel for the same
+  Settings card) all follow this shape: a `Singleton` repository wrapping
   `DataStore<Preferences>` exposing `Flow`s, and a thin `HiltViewModel` turning those into
   `StateFlow`s for Compose. Reach for Room only when the data is a genuine list/relation (like
   `Emi`/`Expense`), not a single app-wide setting.

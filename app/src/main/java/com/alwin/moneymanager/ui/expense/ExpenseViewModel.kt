@@ -1,9 +1,7 @@
 package com.alwin.moneymanager.ui.expense
 
-import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.alwin.moneymanager.data.billing.BillingRepository
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import com.alwin.moneymanager.data.repository.ExpenseRepository
@@ -25,15 +23,10 @@ import javax.inject.Inject
 @HiltViewModel
 class ExpenseViewModel @Inject constructor(
     private val repository: ExpenseRepository,
-    private val billingRepository: BillingRepository,
 ) : ViewModel() {
 
-    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
-
-    fun purchasePremium(activity: Activity) = billingRepository.purchasePremium(activity)
-
-    private val _categories = MutableStateFlow<List<ExpenseCategory>>(emptyList())
-    val categories: StateFlow<List<ExpenseCategory>> = _categories.asStateFlow()
+    val categories: StateFlow<List<ExpenseCategory>> = repository.getAllCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedCategoryId = MutableStateFlow<Long?>(null)
     val selectedCategoryId: StateFlow<Long?> = _selectedCategoryId.asStateFlow()
@@ -41,14 +34,21 @@ class ExpenseViewModel @Inject constructor(
     private val _periodFilter = MutableStateFlow(PeriodFilter(PeriodGranularity.ALL))
     val periodFilter: StateFlow<PeriodFilter> = _periodFilter.asStateFlow()
 
-    private val categoryExpenses = _selectedCategoryId.flatMapLatest { categoryId ->
-        if (categoryId == null) flowOf(emptyList()) else repository.getExpensesByCategory(categoryId)
-    }
-
     val filteredExpenses: StateFlow<List<Expense>> =
-        combine(categoryExpenses, _periodFilter) { expenses, filter ->
-            filterByPeriod(expenses, filter)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        combine(_selectedCategoryId, _periodFilter) { categoryId, filter -> categoryId to filter }
+            .flatMapLatest { (categoryId, filter) ->
+                if (categoryId == null) {
+                    flowOf(emptyList())
+                } else {
+                    val range = periodRange(filter)
+                    if (range == null) {
+                        repository.getExpensesByCategory(categoryId)
+                    } else {
+                        repository.getExpensesByCategoryAndPeriod(categoryId, range.first, range.second)
+                    }
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Current calendar month's spend for the selected category, independent of whatever period
     // the user is currently browsing — a budget is always a monthly concept.
@@ -63,15 +63,13 @@ class ExpenseViewModel @Inject constructor(
 
     // True until categories first load from Room, so the screen shows a spinner instead of
     // briefly flashing "No categories yet" / "Nothing here yet" to a user who actually has data.
-    val isLoading: StateFlow<Boolean> =
-        repository.getAllCategories()
-            .map { false }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val isLoading: StateFlow<Boolean> = categories
+        .map { false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     init {
         viewModelScope.launch {
-            repository.getAllCategories().collect { list ->
-                _categories.value = list
+            categories.collect { list ->
                 if (_selectedCategoryId.value == null && list.isNotEmpty()) {
                     _selectedCategoryId.value = list.first().id
                 }
@@ -92,6 +90,20 @@ class ExpenseViewModel @Inject constructor(
 
     fun updateCategory(category: ExpenseCategory, name: String, budgetLimit: Double?) {
         viewModelScope.launch { repository.updateCategory(category, name, budgetLimit) }
+    }
+
+    suspend fun deleteCategory(categoryId: Long): Int {
+        val result = repository.deleteCategory(categoryId)
+        return when (result) {
+            is com.alwin.moneymanager.data.repository.DeleteCategoryResult.Success -> {
+                // If the deleted category was selected, switch to first available
+                if (_selectedCategoryId.value == categoryId) {
+                    _selectedCategoryId.value = categories.value.firstOrNull { it.id != categoryId }?.id
+                }
+                result.expenseCount
+            }
+            is com.alwin.moneymanager.data.repository.DeleteCategoryResult.NotFound -> 0
+        }
     }
 
     fun setGranularity(granularity: PeriodGranularity) {

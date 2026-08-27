@@ -50,4 +50,6 @@ class BackupReminderRepository @Inject constructor(
     suspend fun snoozeNudge() {
         dataStore.edit { prefs -> prefs[NUDGE_DISMISSED_KEY] = System.currentTimeMillis() }
     }
+
+    val lastBackupMillis: Flow<Long?> = dataStore.data.map { it[LAST_BACKUP_KEY] }
 }

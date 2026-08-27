@@ -16,6 +16,10 @@ sealed class Destination(val route: String) {
         fun createRoute(emiId: Long) = "emi_detail/$emiId"
     }
     data object EmiClosedList : Destination("emi_closed_list")
+    data object ChittiDetail : Destination("chitti_detail/{chittiId}") {
+        const val ARG_CHITTI_ID = "chittiId"
+        fun createRoute(chittiId: Long) = "chitti_detail/$chittiId"
+    }
     data object Expenses : Destination("expenses")
     data object ExpenseSearch : Destination("expense_search")
     data object ExpenseSummary : Destination("expense_summary")
@@ -46,8 +50,8 @@ data class TopLevelDestination(
 
 val topLevelDestinations = listOf(
     TopLevelDestination(Destination.Home, "Home", Icons.Filled.Home),
-    TopLevelDestination(Destination.EmiList, "EMIs", Icons.Filled.CreditCard),
     TopLevelDestination(Destination.Expenses, "Expenses", Icons.Filled.Receipt),
+    TopLevelDestination(Destination.EmiList, "EMI & Chitti", Icons.Filled.CreditCard),
     TopLevelDestination(Destination.Debts, "Debts", Icons.Filled.SwapHoriz),
     TopLevelDestination(Destination.Savings, "Savings", Icons.Filled.Savings),
 )

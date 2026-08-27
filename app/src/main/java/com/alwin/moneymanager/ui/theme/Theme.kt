@@ -1,6 +1,5 @@
 package com.alwin.moneymanager.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +23,9 @@ import androidx.compose.ui.unit.dp
  * shape in particular is a hardcoded pill token, not theme-driven).
  */
 val LocalIsRetroLcdTheme = compositionLocalOf { false }
+
+/** True when the in-app dark mode is on (or Retro LCD). Does not follow the phone setting. */
+val LocalIsDarkTheme = compositionLocalOf { false }
 
 // Neutral zinc-gray scale — a white/near-black surface base with no hue tint of its own, so the
 // picked theme color reads as a single clear accent (shadcn/ui style) instead of the whole app
@@ -231,20 +233,24 @@ private val retroLcdShapes = Shapes(
 
 @Composable
 fun MoneyManagerTheme(
-    seedColor: Color = AppThemeColor.PURPLE.seed,
+    seedColor: Color = AppThemeColor.NAVY.seed,
     themeStyle: AppThemeStyle = AppThemeStyle.DEFAULT,
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isRetro = themeStyle == AppThemeStyle.RETRO_LCD
+    val isDark = isRetro || darkTheme
 
     // Dynamic (wallpaper-based) color is deliberately not used — the user picks a color
     // explicitly in Settings instead, and that should always win regardless of OS version.
-    val colorScheme = if (isRetro) retroLcdColorScheme else tonalColorScheme(seedColor, darkTheme)
-    val typography = if (isRetro) retroLcdTypography else Typography
+    val colorScheme = if (isRetro) retroLcdColorScheme else tonalColorScheme(seedColor, isDark)
+    val typography = if (isRetro) retroLcdTypography else iOSTypography
     val shapes = if (isRetro) retroLcdShapes else Shapes()
 
-    CompositionLocalProvider(LocalIsRetroLcdTheme provides isRetro) {
+    CompositionLocalProvider(
+        LocalIsRetroLcdTheme provides isRetro,
+        LocalIsDarkTheme provides isDark,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = typography,

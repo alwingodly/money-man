@@ -1,5 +1,6 @@
 package com.alwin.moneymanager.ui.expense
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,12 +10,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
@@ -31,8 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.background
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +53,6 @@ fun ExpenseSummaryScreen(
     val mode by viewModel.mode.collectAsState()
     val summaries by viewModel.summaries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val expandedKeys = remember { mutableStateMapOf<Long, Boolean>() }
 
     Scaffold(
         topBar = {
@@ -89,7 +91,7 @@ fun ExpenseSummaryScreen(
                 }
                 summaries.isEmpty() -> {
                     EmptyState(
-                        icon = Icons.Filled.ExpandMore,
+                        icon = Icons.Filled.BarChart,
                         title = "Nothing to summarise yet",
                         subtitle = "Add some expenses and your monthly and yearly totals will appear here.",
                         modifier = Modifier.fillMaxSize(),
@@ -104,8 +106,9 @@ fun ExpenseSummaryScreen(
                         items(summaries, key = { it.sortKey }) { period ->
                             PeriodCard(
                                 period = period,
-                                expanded = expandedKeys[period.sortKey] == true,
-                                onToggle = { expandedKeys[period.sortKey] = expandedKeys[period.sortKey] != true },
+                                selected = false,
+                                expanded = false,
+                                onSelect = {},
                             )
                         }
                     }
@@ -118,14 +121,20 @@ fun ExpenseSummaryScreen(
 @Composable
 private fun PeriodCard(
     period: PeriodSummary,
+    selected: Boolean,
     expanded: Boolean,
-    onToggle: () -> Unit,
+    onSelect: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // macOS-style flat card
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -144,27 +153,34 @@ private fun PeriodCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
-                Icon(
-                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier.padding(start = 8.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
-            if (expanded) {
-                period.categoryBreakdown.forEach { cat ->
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            period.categoryBreakdown.forEach { cat ->
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f).padding(end = 12.dp),
                     ) {
-                        Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium)
-                        LcdAmountText(
-                            formatCurrency(cat.amount),
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(categoryColor(cat.categoryId), CircleShape),
+                        )
+                        Text(
+                            cat.categoryName,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
+                    LcdAmountText(
+                        formatCurrency(cat.amount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
         }

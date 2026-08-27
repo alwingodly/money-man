@@ -8,6 +8,11 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+sealed interface DeleteCategoryResult {
+    data class Success(val expenseCount: Int) : DeleteCategoryResult
+    data object NotFound : DeleteCategoryResult
+}
+
 @Singleton
 class ExpenseRepository @Inject constructor(
     private val expenseDao: ExpenseDao,
@@ -22,11 +27,31 @@ class ExpenseRepository @Inject constructor(
         expenseCategoryDao.updateCategory(category.copy(name = name, budgetLimit = budgetLimit))
     }
 
+    /**
+     * Deletes a category and all its expenses (CASCADE).
+     * Returns a result indicating success or failure with expense count.
+     */
+    suspend fun deleteCategory(categoryId: Long): DeleteCategoryResult {
+        val expenseCount = expenseCategoryDao.getExpenseCount(categoryId)
+        val deleted = expenseCategoryDao.deleteCategory(categoryId)
+        return if (deleted > 0) {
+            DeleteCategoryResult.Success(expenseCount)
+        } else {
+            DeleteCategoryResult.NotFound
+        }
+    }
+
     fun getExpenseTotalForCategoryAndPeriod(categoryId: Long, startMillis: Long, endMillis: Long): Flow<Double> =
         expenseDao.getExpenseTotalForCategoryAndPeriod(categoryId, startMillis, endMillis)
 
     fun getExpensesByCategory(categoryId: Long): Flow<List<Expense>> =
         expenseDao.getExpensesByCategory(categoryId)
+
+    fun getExpensesByCategoryAndPeriod(
+        categoryId: Long,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<List<Expense>> = expenseDao.getExpensesByCategoryAndPeriod(categoryId, startMillis, endMillis)
 
     fun getExpenseTotalForPeriod(startMillis: Long, endMillis: Long): Flow<Double> =
         expenseDao.getExpenseTotalForPeriod(startMillis, endMillis)

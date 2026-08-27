@@ -31,6 +31,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "FORCE_PREMIUM", "false")
     }
 
     signingConfigs {
@@ -56,14 +57,24 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // Personal-use build: identical to release (minified, shrunk, signed, same applicationId)
+        // but with premium forced on locally, so it doesn't need Play Billing. Same package name
+        // as release means installing this simply updates whichever build is already on the
+        // device (in place, keeping app data) — this build type is never uploaded to Play Console.
+        create("personal") {
+            initWith(getByName("release"))
+            buildConfigField("boolean", "FORCE_PREMIUM", "true")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-        freeCompilerArgs += listOf("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+        }
     }
     buildFeatures {
         compose = true
@@ -104,13 +115,15 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.process)
 
-    implementation(libs.billing.ktx)
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m3)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

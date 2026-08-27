@@ -1,6 +1,8 @@
 package com.alwin.moneymanager.ui.settings
 
-import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -31,7 +34,6 @@ import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -69,13 +71,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.HomeSection
 import com.alwin.moneymanager.ui.applock.AppLockViewModel
-import com.alwin.moneymanager.ui.common.PaywallDialog
 import com.alwin.moneymanager.ui.home.HomeSectionsViewModel
 import com.alwin.moneymanager.ui.navigation.NavTabsViewModel
 import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
 import com.alwin.moneymanager.ui.theme.AppThemeColor
+import com.alwin.moneymanager.ui.theme.AppThemeMode
 import com.alwin.moneymanager.ui.theme.AppThemeStyle
-import com.alwin.moneymanager.ui.theme.FREE_THEME_COLORS
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
 import com.alwin.moneymanager.util.CurrencyType
 import java.text.SimpleDateFormat
@@ -99,17 +100,17 @@ fun SettingsScreen(
     val lockOnBackground by appLockViewModel.lockOnBackground.collectAsState()
     val isBackupWorking by backupViewModel.isWorking.collectAsState()
     val backupEvent by backupViewModel.event.collectAsState()
+    val isAutoBackupEnabled by backupViewModel.isAutoBackupEnabled.collectAsState()
+    val lastBackupMillis by backupViewModel.lastBackupMillis.collectAsState()
     var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var themePaywallMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val activity = context as Activity
-    val isPremium by themeViewModel.isPremium.collectAsState()
 
     LaunchedEffect(backupEvent) {
         val event = backupEvent ?: return@LaunchedEffect
         val message = when (event) {
             BackupEvent.ExportSucceeded -> "Backup saved"
             BackupEvent.ImportSucceeded -> "Data restored from backup"
+            BackupEvent.AutoBackupEnabled -> "Auto backup on — file updates when you leave the app"
             is BackupEvent.Failed -> event.message
         }
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -123,6 +124,18 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { pendingImportUri = it } }
+
+    val autoBackupFolderLauncher = rememberLauncherForActivityResult(
+        contract = object : ActivityResultContracts.OpenDocumentTree() {
+            override fun createIntent(context: android.content.Context, input: Uri?): Intent {
+                return super.createIntent(context, input).addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+                )
+            }
+        },
+    ) { uri -> uri?.let(backupViewModel::enableAutoBackup) }
 
     Scaffold(
         topBar = {
@@ -161,26 +174,60 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
+                val themeMode by themeViewModel.themeMode.collectAsState()
+                val themeStyle by themeViewModel.themeStyle.collectAsState()
+                val colorPickerEnabled = themeStyle == AppThemeStyle.DEFAULT
+
+                Text(
+                    "Look",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Chosen here. Doesn't follow your phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AppThemeMode.entries.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            selected = themeMode == mode,
+                            onClick = { themeViewModel.setThemeMode(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = AppThemeMode.entries.size,
+                            ),
+                            enabled = colorPickerEnabled,
+                            icon = {
+                                if (themeMode == mode) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                } else {
+                                    SegmentedButtonDefaults.Icon(active = false)
+                                }
+                            },
+                        ) {
+                            Text(mode.label)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
                 Text(
                     "Theme style",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                ThemeStylePicker(
-                    themeViewModel = themeViewModel,
-                    isPremium = isPremium,
-                    onLockedStyleClick = {
-                        themePaywallMessage = "Retro LCD is a premium look — grab me a ₹9 " +
-                            "coffee and unlock it (plus every other color) for good."
-                    },
-                )
+                ThemeStylePicker(themeViewModel = themeViewModel)
                 Spacer(Modifier.height(16.dp))
 
-                val themeStyle by themeViewModel.themeStyle.collectAsState()
-                val colorPickerEnabled = themeStyle == AppThemeStyle.DEFAULT
                 Text(
-                    "Theme color",
+                    "Accent color",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -188,30 +235,7 @@ fun SettingsScreen(
                 ThemeColorPicker(
                     themeViewModel = themeViewModel,
                     enabled = colorPickerEnabled,
-                    isPremium = isPremium,
-                    onLockedColorClick = {
-                        themePaywallMessage = "That one's a premium color — grab me a ₹9 " +
-                            "coffee and unlock the whole crazy palette (plus Retro LCD)."
-                    },
                 )
-            }
-
-            SettingsSection(title = "Premium", icon = Icons.Filled.LocalCafe) {
-                if (isPremium) {
-                    Text(
-                        "You've unlocked premium — thank you for the coffee! ☕",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                } else {
-                    ActionRow(
-                        title = "Buy me a coffee",
-                        subtitle = "Unlock unlimited categories, unlimited loans, every theme " +
-                            "color, and Retro LCD",
-                        buttonLabel = "₹9",
-                        enabled = true,
-                        onClick = { themeViewModel.purchasePremium(activity) },
-                    )
-                }
             }
 
             SettingsSection(title = "Currency", icon = Icons.Filled.CurrencyExchange) {
@@ -254,6 +278,30 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "Backup & Restore", icon = Icons.Filled.Save) {
+                SettingRow(
+                    title = "Auto backup",
+                    subtitle = autoBackupSubtitle(isAutoBackupEnabled, lastBackupMillis),
+                    checked = isAutoBackupEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            autoBackupFolderLauncher.launch(downloadsTreeHintUri())
+                        } else {
+                            backupViewModel.disableAutoBackup()
+                        }
+                    },
+                    enabled = !isBackupWorking,
+                )
+                if (isAutoBackupEnabled) {
+                    SettingDivider()
+                    ActionRow(
+                        title = "Backup folder",
+                        subtitle = "Choose a different folder for the auto-backup file",
+                        buttonLabel = "Change",
+                        enabled = !isBackupWorking,
+                        onClick = { autoBackupFolderLauncher.launch(downloadsTreeHintUri()) },
+                    )
+                }
+                SettingDivider()
                 ActionRow(
                     title = "Export data",
                     subtitle = "Save a backup file to your device",
@@ -321,17 +369,22 @@ fun SettingsScreen(
             },
         )
     }
+}
 
-    themePaywallMessage?.let { message ->
-        PaywallDialog(
-            message = message,
-            onDismiss = { themePaywallMessage = null },
-            onUnlock = {
-                themeViewModel.purchasePremium(activity)
-                themePaywallMessage = null
-            },
-        )
+private fun autoBackupSubtitle(enabled: Boolean, lastBackupMillis: Long?): String {
+    if (!enabled) {
+        return "Saves a JSON copy to a folder you choose. Survives uninstall."
     }
+    if (lastBackupMillis == null || lastBackupMillis == 0L) {
+        return "Updates moneymanager-auto-backup.json when you leave the app"
+    }
+    val stamp = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(lastBackupMillis))
+    return "Last saved $stamp"
+}
+
+private fun downloadsTreeHintUri(): Uri? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    return Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload")
 }
 
 @Composable
@@ -340,23 +393,32 @@ private fun SettingsSection(
     icon: ImageVector,
     content: @Composable () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    // macOS-style flat section card
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            )
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
             content()
         }
     }
@@ -370,20 +432,17 @@ private fun SettingDivider() {
 @Composable
 private fun ThemeStylePicker(
     themeViewModel: ThemeViewModel,
-    isPremium: Boolean,
-    onLockedStyleClick: () -> Unit,
 ) {
     val selected by themeViewModel.themeStyle.collectAsState()
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         AppThemeStyle.entries.forEachIndexed { index, style ->
-            val locked = style == AppThemeStyle.RETRO_LCD && !isPremium
             SegmentedButton(
                 selected = style == selected,
-                onClick = { if (locked) onLockedStyleClick() else themeViewModel.setThemeStyle(style) },
+                onClick = { themeViewModel.setThemeStyle(style) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = AppThemeStyle.entries.size),
                 icon = {
-                    if (locked) {
-                        Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                    if (style == selected) {
+                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                     } else {
                         SegmentedButtonDefaults.Icon(active = style == selected)
                     }
@@ -399,8 +458,6 @@ private fun ThemeStylePicker(
 private fun ThemeColorPicker(
     themeViewModel: ThemeViewModel,
     enabled: Boolean = true,
-    isPremium: Boolean,
-    onLockedColorClick: () -> Unit,
 ) {
     val selected by themeViewModel.themeColor.collectAsState()
     LazyRow(
@@ -409,13 +466,11 @@ private fun ThemeColorPicker(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(AppThemeColor.entries) { color ->
-            val locked = color !in FREE_THEME_COLORS && !isPremium
             ColorSwatch(
                 color = color,
                 isSelected = color == selected,
                 enabled = enabled,
-                locked = locked,
-                onClick = { if (locked) onLockedColorClick() else themeViewModel.setThemeColor(color) },
+                onClick = { themeViewModel.setThemeColor(color) },
             )
         }
     }
@@ -456,26 +511,36 @@ private fun ColorSwatch(
     isSelected: Boolean,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    locked: Boolean = false,
 ) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .background(color.seed, CircleShape)
-            .then(
-                if (isSelected) {
-                    Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                } else {
-                    Modifier
-                }
-            )
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            locked -> Icon(Icons.Filled.Lock, contentDescription = "${color.label} — premium", tint = Color.White, modifier = Modifier.size(18.dp))
-            isSelected -> Icon(Icons.Filled.Check, contentDescription = color.label, tint = Color.White)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(color.seed, CircleShape)
+                .then(
+                    if (isSelected) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    } else {
+                        Modifier
+                    }
+                )
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isSelected) {
+                Icon(Icons.Filled.Check, contentDescription = color.label, tint = Color.White)
+            }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            color.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 

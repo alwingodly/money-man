@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,9 +55,13 @@ fun CelebrationDialog(
     Dialog(onDismissRequest = onDismiss) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(340.dp)) {
             ConfettiBurst(modifier = Modifier.fillMaxWidth().height(340.dp))
-            Card(
-                shape = if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            // macOS-style flat dialog
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(20.dp)
+                    )
             ) {
                 Column(
                     modifier = Modifier.padding(28.dp),

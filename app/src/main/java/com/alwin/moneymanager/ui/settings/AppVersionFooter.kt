@@ -42,7 +42,7 @@ fun AppVersionFooter(modifier: Modifier = Modifier) {
     var showStash by remember { mutableStateOf(false) }
 
     Text(
-        text = "Money Manager · v$APP_VERSION",
+        text = "FinBook · v$APP_VERSION",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -91,7 +91,7 @@ private fun MoneyStashDialog(onDismiss: () -> Unit) {
                 // rotationY spins the coin like it's flipping on a table.
                 Text("🪙", fontSize = 64.sp, modifier = Modifier.graphicsLayer { rotationY = rotation })
                 Text(
-                    "A rupee saved is a rupee earned.\nThanks for using Money Manager 💛",
+                    "A rupee saved is a rupee earned.\nThanks for using FinBook 💛",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

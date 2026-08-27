@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 import java.time.ZoneId
@@ -27,7 +28,7 @@ data class PeriodSummary(
     val categoryBreakdown: List<CategoryTotal>,
 )
 
-data class CategoryTotal(val categoryName: String, val amount: Double)
+data class CategoryTotal(val categoryId: Long, val categoryName: String, val amount: Double)
 
 @HiltViewModel
 class ExpenseSummaryViewModel @Inject constructor(
@@ -40,7 +41,7 @@ class ExpenseSummaryViewModel @Inject constructor(
     private val _mode = MutableStateFlow(SummaryMode.MONTH)
     val mode: StateFlow<SummaryMode> = _mode.asStateFlow()
 
-    val summaries: StateFlow<List<PeriodSummary>> = combine(
+    private val summaryState: StateFlow<List<PeriodSummary>?> = combine(
         repository.getAllExpenses(),
         repository.getAllCategories(),
         _mode,
@@ -57,19 +58,35 @@ class ExpenseSummaryViewModel @Inject constructor(
                     categoryBreakdown = items
                         .groupBy { it.categoryId }
                         .map { (categoryId, list) ->
-                            CategoryTotal(nameById[categoryId] ?: "Unknown", list.sumOf { it.amount })
+                            CategoryTotal(categoryId, nameById[categoryId] ?: "Unknown", list.sumOf { it.amount })
                         }
                         .sortedByDescending { it.amount },
                 )
             }
             .sortedByDescending { it.sortKey }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val isLoading: StateFlow<Boolean> = combine(repository.getAllExpenses(), _mode) { _, _ -> false }
+    val summaries: StateFlow<List<PeriodSummary>> = summaryState
+        .map { it.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _selectedSortKey = MutableStateFlow<Long?>(null)
+
+    val selectedPeriod: StateFlow<PeriodSummary?> = combine(summaries, _selectedSortKey) { list, key ->
+        list.firstOrNull { it.sortKey == key } ?: list.firstOrNull()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val isLoading: StateFlow<Boolean> = summaryState
+        .map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     fun setMode(mode: SummaryMode) {
         _mode.value = mode
+        _selectedSortKey.value = null
+    }
+
+    fun selectPeriod(sortKey: Long) {
+        _selectedSortKey.value = sortKey
     }
 
     /** A comparable key: year*100 + month for months, year for years. */

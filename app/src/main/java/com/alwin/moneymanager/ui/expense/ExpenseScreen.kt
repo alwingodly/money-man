@@ -1,6 +1,7 @@
 package com.alwin.moneymanager.ui.expense
 
 import android.app.Activity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
@@ -23,7 +25,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
@@ -45,6 +46,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,9 +71,8 @@ import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
-import com.alwin.moneymanager.data.repository.PremiumLimits
+import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.ui.common.EmptyState
-import com.alwin.moneymanager.ui.common.PaywallDialog
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import java.text.DateFormat
@@ -96,12 +97,10 @@ fun ExpenseScreen(
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
+    var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
     var editingCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
-    var showCategoryPaywall by remember { mutableStateOf(false) }
-
+    var categoryPendingDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
     val categories by viewModel.categories.collectAsState()
-    val isPremium by viewModel.isPremium.collectAsState()
-    val activity = LocalContext.current as Activity
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
     val periodFilter by viewModel.periodFilter.collectAsState()
     val expenses by viewModel.filteredExpenses.collectAsState()
@@ -109,7 +108,8 @@ fun ExpenseScreen(
     val currentMonthSpendForSelected by viewModel.currentMonthSpendForSelectedCategory.collectAsState()
     val selectedCategory = categories.find { it.id == selectedCategoryId }
 
-    val total = expenses.sumOf { it.amount }
+    val total = remember(expenses) { expenses.sumOf { it.amount } }
+    val expensesByDay = remember(expenses) { groupExpensesByDay(expenses) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -180,13 +180,7 @@ fun ExpenseScreen(
                 categories = categories,
                 selectedCategoryId = selectedCategoryId,
                 onSelectCategory = viewModel::selectCategory,
-                onAddCategoryClick = {
-                    if (!isPremium && categories.size >= PremiumLimits.FREE_CATEGORY_LIMIT) {
-                        showCategoryPaywall = true
-                    } else {
-                        showAddCategoryDialog = true
-                    }
-                },
+                onAddCategoryClick = { showAddCategoryDialog = true },
                 onEditCategoryClick = { editingCategory = it },
             )
 
@@ -230,7 +224,6 @@ fun ExpenseScreen(
                             ExpenseRow(
                                 expense = expense,
                                 showDate = false,
-                                onDelete = { onDeleteExpense(expense) },
                                 onEditClick = { editingExpense = expense },
                             )
                         }
@@ -242,7 +235,7 @@ fun ExpenseScreen(
                         contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        groupExpensesByDay(expenses).forEach { (date, dayExpenses) ->
+                        expensesByDay.forEach { (date, dayExpenses) ->
                             item(key = "header_$date") {
                                 DayHeader(
                                     date = date,
@@ -253,7 +246,6 @@ fun ExpenseScreen(
                                 ExpenseRow(
                                     expense = expense,
                                     showDate = false,
-                                    onDelete = { onDeleteExpense(expense) },
                                     onEditClick = { editingExpense = expense },
                                     modifier = Modifier.padding(bottom = 4.dp),
                                 )
@@ -286,6 +278,20 @@ fun ExpenseScreen(
                 viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard)
                 editingExpense = null
             },
+            onDelete = { expensePendingDelete = expense },
+        )
+    }
+
+    expensePendingDelete?.let { expense ->
+        ConfirmDeleteDialog(
+            title = "Delete expense?",
+            message = "This will permanently delete this expense.",
+            onConfirm = {
+                expensePendingDelete = null
+                editingExpense = null
+                onDeleteExpense(expense)
+            },
+            onDismiss = { expensePendingDelete = null },
         )
     }
 
@@ -299,17 +305,6 @@ fun ExpenseScreen(
         )
     }
 
-    if (showCategoryPaywall) {
-        PaywallDialog(
-            message = "Whoa, category #${categories.size + 1}! Grab me a ₹9 coffee and add " +
-                "as many categories as you like, forever.",
-            onDismiss = { showCategoryPaywall = false },
-            onUnlock = {
-                viewModel.purchasePremium(activity)
-                showCategoryPaywall = false
-            },
-        )
-    }
 
     editingCategory?.let { category ->
         AddCategoryDialog(
@@ -319,6 +314,32 @@ fun ExpenseScreen(
                 viewModel.updateCategory(category, name, budgetLimit)
                 editingCategory = null
             },
+            onDelete = {
+                categoryPendingDelete = category
+                editingCategory = null
+            },
+        )
+    }
+
+    categoryPendingDelete?.let { category ->
+        ConfirmDeleteDialog(
+            title = "Delete category?",
+            message = "This will permanently delete the category \"${category.name}\" and all its expenses. This cannot be undone.",
+            onConfirm = {
+                scope.launch {
+                    val deletedCount = viewModel.deleteCategory(category.id)
+                    categoryPendingDelete = null
+                    snackbarHostState.showSnackbar(
+                        message = if (deletedCount > 0) {
+                            "Deleted \"${category.name}\" and $deletedCount ${if (deletedCount == 1) "expense" else "expenses"}"
+                        } else {
+                            "Deleted \"${category.name}\""
+                        },
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+            },
+            onDismiss = { categoryPendingDelete = null },
         )
     }
 
@@ -350,7 +371,7 @@ private fun FilterPanel(
     onEditCategoryClick: (ExpenseCategory) -> Unit,
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(categories, key = { it.id }) { category ->
@@ -396,74 +417,71 @@ private fun TotalSummaryCard(
 ) {
     val showNav = periodFilter.granularity != PeriodGranularity.ALL
     val budget = selectedCategory?.budgetLimit
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    
+    // Clean minimal design with primary color emphasis
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(
-                start = if (showNav) 4.dp else 16.dp,
-                end = if (showNav) 4.dp else 16.dp,
-                top = 8.dp,
-                bottom = 8.dp,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
+        if (showNav) {
+            IconButton(onClick = { onShiftPeriod(-1) }) {
+                Icon(
+                    Icons.Filled.ChevronLeft,
+                    contentDescription = "Previous period",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f), 
+            horizontalAlignment = if (showNav) Alignment.CenterHorizontally else Alignment.Start
         ) {
-            if (showNav) {
-                IconButton(onClick = { onShiftPeriod(-1) }) {
-                    Icon(
-                        Icons.Filled.ChevronLeft,
-                        contentDescription = "Previous period",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
+            Text(
+                if (showNav) periodLabel(periodFilter) else "Total",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            LcdAmountText(
+                formatCurrency(total),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        if (budget != null) {
+            val remaining = budget - spentThisMonth
+            val isOver = remaining < 0
+            val amountColor = when {
+                isOver -> MaterialTheme.colorScheme.error
+                spentThisMonth >= budget * 0.8 -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.primary
             }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = if (showNav) Alignment.CenterHorizontally else Alignment.Start) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            ) {
                 Text(
-                    if (showNav) periodLabel(periodFilter) else "Total",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                LcdAmountText(
-                    formatCurrency(total),
-                    style = MaterialTheme.typography.titleLarge,
+                    formatCurrency(kotlin.math.abs(remaining)),
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = amountColor,
+                )
+                Text(
+                    if (isOver) "over" else "left",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = amountColor,
                 )
             }
-            if (budget != null) {
-                val remaining = budget - spentThisMonth
-                val isOver = remaining < 0
-                val amountColor = when {
-                    isOver -> MaterialTheme.colorScheme.error
-                    spentThisMonth >= budget * 0.8 -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.onPrimaryContainer
-                }
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                ) {
-                    Text(
-                        formatCurrency(kotlin.math.abs(remaining)),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = amountColor,
-                    )
-                    Text(
-                        if (isOver) "over" else "left",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = amountColor,
-                    )
-                }
-            }
-            if (showNav) {
-                IconButton(onClick = { onShiftPeriod(1) }) {
-                    Icon(
-                        Icons.Filled.ChevronRight,
-                        contentDescription = "Next period",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
+        }
+        if (showNav) {
+            IconButton(onClick = { onShiftPeriod(1) }) {
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = "Next period",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }
@@ -494,51 +512,41 @@ private fun DayHeader(date: LocalDate, subtotal: Double) {
 private fun ExpenseRow(
     expense: Expense,
     showDate: Boolean,
-    onDelete: () -> Unit,
     onEditClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onEditClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (expense.isCreditCard) {
-                        Icon(
-                            Icons.Filled.CreditCard,
-                            contentDescription = "Paid by credit card",
-                            modifier = Modifier.padding(start = 6.dp).size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (expense.note.isNotBlank()) {
-                    Text(
-                        expense.note,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (showDate) {
-                    Text(
-                        dateFormat.format(Date(expense.dateMillis)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (expense.isCreditCard) {
+                    Icon(
+                        Icons.Filled.CreditCard,
+                        contentDescription = "Paid by credit card",
+                        modifier = Modifier.padding(start = 6.dp).size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete expense")
+            // Always show a title (note or default "Expense")
+            Text(
+                if (expense.note.isNotBlank()) expense.note else "Expense",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (showDate) {
+                Text(
+                    dateFormat.format(Date(expense.dateMillis)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

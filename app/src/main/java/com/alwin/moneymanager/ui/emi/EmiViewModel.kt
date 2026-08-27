@@ -1,9 +1,10 @@
 package com.alwin.moneymanager.ui.emi
 
-import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.alwin.moneymanager.data.billing.BillingRepository
+import com.alwin.moneymanager.data.local.entity.Chitti
+import com.alwin.moneymanager.data.repository.ChittiRepository
+import com.alwin.moneymanager.data.repository.ChittiWithProgress
 import com.alwin.moneymanager.data.repository.EmiMonthSummary
 import com.alwin.moneymanager.data.repository.EmiPeriodTotals
 import com.alwin.moneymanager.data.repository.EmiRepository
@@ -20,29 +21,26 @@ import javax.inject.Inject
 @HiltViewModel
 class EmiViewModel @Inject constructor(
     private val repository: EmiRepository,
-    private val billingRepository: BillingRepository,
+    private val chittiRepository: ChittiRepository,
 ) : ViewModel() {
 
-    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
-
-    fun purchasePremium(activity: Activity) = billingRepository.purchasePremium(activity)
+    private val allEmis: StateFlow<List<EmiWithProgress>> = repository.getAllEmisWithProgress()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** Active loans only — closed ones move to [closedEmiList] to keep this list uncluttered. */
-    val emiList: StateFlow<List<EmiWithProgress>> = repository.getAllEmisWithProgress()
+    val emiList: StateFlow<List<EmiWithProgress>> = allEmis
         .map { list -> list.filterNot { it.emi.isCompleted } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val closedEmiList: StateFlow<List<EmiWithProgress>> = repository.getAllEmisWithProgress()
+    val closedEmiList: StateFlow<List<EmiWithProgress>> = allEmis
         .map { list -> list.filter { it.emi.isCompleted } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val monthSummary: StateFlow<EmiMonthSummary> = repository.getCurrentMonthSummary()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EmiMonthSummary(0.0, 0.0))
 
-    /** EMI outgoing bucketed by month and year (every loan's whole schedule), for the totals view. */
-    val periodTotals: StateFlow<EmiPeriodTotals> = repository.getAllEmisWithProgress()
-        .map { it.periodTotals() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EmiPeriodTotals(emptyList(), emptyList()))
+    /** Computed only when the totals dialog opens — not on every EMI payment. */
+    fun periodTotalsSnapshot(): EmiPeriodTotals = allEmis.value.periodTotals()
 
     fun addEmi(form: EmiFormResult) {
         viewModelScope.launch {
@@ -64,5 +62,28 @@ class EmiViewModel @Inject constructor(
 
     fun deleteEmi(emiWithProgress: EmiWithProgress) {
         viewModelScope.launch { repository.deleteEmi(emiWithProgress.emi) }
+    }
+
+    /** Active chittis only — completed ones are filtered out. */
+    val chittiList: StateFlow<List<ChittiWithProgress>> = chittiRepository.getAllChittisWithProgress()
+        .map { list -> list.filterNot { it.chitti.isCompleted } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addChitti(form: ChittiForm) {
+        viewModelScope.launch {
+            chittiRepository.insertChitti(
+                Chitti(
+                    name = form.name,
+                    totalMonths = form.totalMonths,
+                    startDateMillis = form.startDateMillis,
+                    notes = form.notes,
+                    frequency = form.frequency,
+                )
+            )
+        }
+    }
+
+    fun deleteChitti(chittiWithProgress: ChittiWithProgress) {
+        viewModelScope.launch { chittiRepository.deleteChitti(chittiWithProgress.chitti) }
     }
 }

@@ -1,5 +1,6 @@
 package com.alwin.moneymanager.ui.debt
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -178,11 +180,14 @@ private fun SummaryTile(
     onContainer: Color,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = container),
+    // macOS-style flat tile
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.background(
+            color = container.copy(alpha = 0.4f),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+        )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = onContainer)
             LcdAmountText(
                 formatCurrency(value),
@@ -199,12 +204,18 @@ internal fun DebtRow(item: DebtWithProgress, onClick: () -> Unit) {
     val debt = item.debt
     val owesYou = item.netBalance > 0
     val accent = if (owesYou) getColor() else MaterialTheme.colorScheme.error
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // macOS-style flat row
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -5,14 +5,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -42,6 +50,7 @@ fun AddExpenseDialog(
     onConfirm: (categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) -> Unit,
     initialCategoryId: Long? = null,
     existing: Expense? = null,
+    onDelete: (() -> Unit)? = null,
 ) {
     var amount by remember { mutableStateOf(existing?.amount?.toString() ?: "") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
@@ -114,6 +123,22 @@ fun AddExpenseDialog(
                 ) {
                     Text("Paid by credit card")
                     Switch(checked = isCreditCard, onCheckedChange = { isCreditCard = it })
+                }
+                if (isEditing && onDelete != null) {
+                    HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.padding(top = 4.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete expense")
+                    }
                 }
             }
         },

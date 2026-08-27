@@ -54,7 +54,7 @@ private data class OnboardingPage(
 private val onboardingPages = listOf(
     OnboardingPage(
         icon = Icons.Filled.Home,
-        title = "Welcome to Money Manager",
+        title = "Welcome to FinBook",
         description = "Everything about your money in one simple app. No sign-up, works fully " +
             "offline, and your data stays only on your phone.",
     ),

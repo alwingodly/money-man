@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.Expense
+import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
@@ -62,6 +63,7 @@ fun DayDetailScreen(
     val categoryNameById = remember(categories) { categories.associate { it.id to it.name } }
     val total = expenses.sumOf { it.amount }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
+    var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -93,9 +95,15 @@ fun DayDetailScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            // macOS-style flat total card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                    )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -129,7 +137,6 @@ fun DayDetailScreen(
                         DayExpenseRow(
                             expense = expense,
                             categoryName = categoryNameById[expense.categoryId] ?: "Unknown",
-                            onDelete = { onDeleteExpense(expense) },
                             onEditClick = { editingExpense = expense },
                         )
                     }
@@ -147,6 +154,20 @@ fun DayDetailScreen(
                 viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard)
                 editingExpense = null
             },
+            onDelete = { expensePendingDelete = expense },
+        )
+    }
+
+    expensePendingDelete?.let { expense ->
+        ConfirmDeleteDialog(
+            title = "Delete expense?",
+            message = "This will permanently delete this expense.",
+            onConfirm = {
+                expensePendingDelete = null
+                editingExpense = null
+                onDeleteExpense(expense)
+            },
+            onDismiss = { expensePendingDelete = null },
         )
     }
 
@@ -156,54 +177,50 @@ fun DayDetailScreen(
 private fun DayExpenseRow(
     expense: Expense,
     categoryName: String,
-    onDelete: () -> Unit,
     onEditClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEditClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    // macOS-style flat expense row
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEditClick)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(8.dp)
+            )
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (expense.isCreditCard) {
-                        Icon(
-                            Icons.Filled.CreditCard,
-                            contentDescription = "Paid by credit card",
-                            modifier = Modifier.padding(start = 6.dp).size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(categoryColor(expense.categoryId), CircleShape),
-                    )
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-                if (expense.note.isNotBlank()) {
-                    Text(
-                        expense.note,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (expense.isCreditCard) {
+                    Icon(
+                        Icons.Filled.CreditCard,
+                        contentDescription = "Paid by credit card",
+                        modifier = Modifier.padding(start = 6.dp).size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete expense")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(categoryColor(expense.categoryId), CircleShape),
+                )
+                Text(
+                    categoryName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            if (expense.note.isNotBlank()) {
+                Text(
+                    expense.note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
     }

@@ -3,11 +3,14 @@ package com.alwin.moneymanager.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.alwin.moneymanager.data.local.dao.ChittiDao
 import com.alwin.moneymanager.data.local.dao.DebtDao
 import com.alwin.moneymanager.data.local.dao.EmiDao
 import com.alwin.moneymanager.data.local.dao.ExpenseCategoryDao
 import com.alwin.moneymanager.data.local.dao.ExpenseDao
 import com.alwin.moneymanager.data.local.dao.SavingDao
+import com.alwin.moneymanager.data.local.entity.Chitti
+import com.alwin.moneymanager.data.local.entity.ChittiPayment
 import com.alwin.moneymanager.data.local.entity.Debt
 import com.alwin.moneymanager.data.local.entity.DebtEntry
 import com.alwin.moneymanager.data.local.entity.Emi
@@ -22,8 +25,9 @@ import com.alwin.moneymanager.data.local.entity.SavingContribution
         Emi::class, EmiPayment::class, Expense::class, ExpenseCategory::class,
         Debt::class, DebtEntry::class,
         Saving::class, SavingContribution::class,
+        Chitti::class, ChittiPayment::class,
     ],
-    version = 15,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,6 +37,7 @@ abstract class MoneyManagerDatabase : RoomDatabase() {
     abstract fun expenseCategoryDao(): ExpenseCategoryDao
     abstract fun debtDao(): DebtDao
     abstract fun savingDao(): SavingDao
+    abstract fun chittiDao(): ChittiDao
 
     companion object {
         const val DATABASE_NAME = "moneymanager.db"

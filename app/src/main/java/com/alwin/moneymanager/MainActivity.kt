@@ -18,6 +18,7 @@ import com.alwin.moneymanager.ui.navigation.MoneyManagerNavHost
 import com.alwin.moneymanager.ui.onboarding.OnboardingScreen
 import com.alwin.moneymanager.ui.onboarding.OnboardingViewModel
 import com.alwin.moneymanager.ui.settings.CurrencyViewModel
+import com.alwin.moneymanager.ui.theme.AppThemeMode
 import com.alwin.moneymanager.ui.theme.MoneyManagerTheme
 import com.alwin.moneymanager.ui.theme.ThemeViewModel
 import com.alwin.moneymanager.util.currentCurrency
@@ -43,9 +44,14 @@ class MainActivity : FragmentActivity() {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val themeColor by themeViewModel.themeColor.collectAsState()
             val themeStyle by themeViewModel.themeStyle.collectAsState()
+            val themeMode by themeViewModel.themeMode.collectAsState()
             val currencyViewModel: CurrencyViewModel = hiltViewModel()
             currentCurrency = currencyViewModel.currency.collectAsState().value
-            MoneyManagerTheme(seedColor = themeColor.seed, themeStyle = themeStyle) {
+            MoneyManagerTheme(
+                seedColor = themeColor.seed,
+                themeStyle = themeStyle,
+                darkTheme = themeMode == AppThemeMode.DARK,
+            ) {
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
                 val hasSeenOnboarding by onboardingViewModel.hasSeenOnboarding.collectAsState()
                 if (hasSeenOnboarding) {

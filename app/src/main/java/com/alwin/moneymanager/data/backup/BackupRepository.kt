@@ -33,11 +33,49 @@ class BackupRepository @Inject constructor(
     private val reminderScheduler: EmiReminderScheduler,
     private val debtReminderScheduler: DebtReminderScheduler,
     private val backupReminderRepository: BackupReminderRepository,
+    private val autoBackupRepository: AutoBackupRepository,
     @ApplicationContext private val context: Context,
 ) {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    private val compactJson = Json { prettyPrint = false; ignoreUnknownKeys = true }
+
+    @Volatile
+    private var lastAutoExportAtMillis: Long = 0L
+
+    companion object {
+        private const val AUTO_EXPORT_MIN_INTERVAL_MS = 5 * 60 * 1000L
+    }
 
     suspend fun exportTo(uri: Uri) = withContext(Dispatchers.IO) {
+        writeExport(uri, pretty = true)
+        backupReminderRepository.recordBackup()
+    }
+
+    /**
+     * No-op when auto backup is off. Failures are swallowed: leaving the app must never crash
+     * because a folder permission disappeared. If the remembered file is gone, recreate it once.
+     */
+    suspend fun tryAutoExport() = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (now - lastAutoExportAtMillis < AUTO_EXPORT_MIN_INTERVAL_MS) return@withContext
+        val fileUri = autoBackupRepository.fileUriOrNull() ?: return@withContext
+        try {
+            writeExport(fileUri, pretty = false)
+            lastAutoExportAtMillis = now
+            backupReminderRepository.recordBackup()
+        } catch (_: Exception) {
+            val recovered = autoBackupRepository.recreateFile() ?: return@withContext
+            try {
+                writeExport(recovered, pretty = false)
+                lastAutoExportAtMillis = now
+                backupReminderRepository.recordBackup()
+            } catch (_: Exception) {
+                // Permission lost or storage full — recreateFile turns auto backup off if the folder is gone.
+            }
+        }
+    }
+
+    private suspend fun writeExport(uri: Uri, pretty: Boolean) {
         val export = MoneyManagerExport(
             exportedAtMillis = System.currentTimeMillis(),
             emis = emiDao.getAllEmisSnapshot(),
@@ -49,11 +87,10 @@ class BackupRepository @Inject constructor(
             savings = savingDao.getAllSavingsSnapshot(),
             savingContributions = savingDao.getAllContributionsSnapshot(),
         )
-        val content = json.encodeToString(export)
-        context.contentResolver.openOutputStream(uri)?.use { output ->
+        val content = (if (pretty) json else compactJson).encodeToString(export)
+        context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
             output.write(content.toByteArray())
         } ?: throw IOException("Could not open the selected file for writing")
-        backupReminderRepository.recordBackup()
     }
 
     /**

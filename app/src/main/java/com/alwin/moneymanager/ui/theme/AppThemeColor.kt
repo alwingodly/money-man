@@ -3,50 +3,49 @@ package com.alwin.moneymanager.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Curated primary-color presets a user can pick from in Settings — not a free hex-input field.
- * Values are the Tailwind-500 shades (a widely-used, pre-vetted "vibrant SaaS app" palette) —
- * swapped in from the original, more muted dataviz-derived hues because they read as flat/dull
- * once turned into a full app theme (as opposed to small chart dots, where the original set came
- * from). Enum constant *names* are kept stable even though labels/hexes changed, since a user's
- * choice is persisted as `AppThemeColor.name` in DataStore (`ThemeRepository`) — renaming the
- * constants would silently reset anyone who'd already picked a color back to the default.
+ * Accent presets for Settings. Kept small and muted so the app reads as a finance tool,
+ * not a rainbow of SaaS marketing colors. Enum names are stored in DataStore — [appThemeColorFromName]
+ * maps older playful names onto this set so existing installs don't lose their choice.
  */
 enum class AppThemeColor(val label: String, val seed: Color) {
-    // Ordered as a rainbow for the picker (which renders in declaration order). Enum *names* stay
-    // stable — a user's choice is persisted as `.name` — so only add/reorder, never rename.
-    ROSE("Rose", Color(0xFFF43F5E)),
-    RED("Red", Color(0xFFEF4444)),
-    ORANGE("Orange", Color(0xFFF97316)),
-    AMBER("Amber", Color(0xFFF59E0B)),
-    LIME("Lime", Color(0xFF84CC16)),
-    GREEN("Green", Color(0xFF22C55E)),
-    EMERALD("Emerald", Color(0xFF10B981)),
-    TEAL("Teal", Color(0xFF14B8A6)),
-    CYAN("Cyan", Color(0xFF06B6D4)),
-    BLUE("Sky", Color(0xFF0EA5E9)),
-    COBALT("Blue", Color(0xFF3B82F6)),
-    PURPLE("Indigo", Color(0xFF6366F1)),
-    VIOLET("Violet", Color(0xFF8B5CF6)),
-    MAGENTA("Magenta", Color(0xFFD946EF)),
-    PINK("Pink", Color(0xFFEC4899)),
-    SLATE("Slate", Color(0xFF64748B)),
+    NAVY("Navy", Color(0xFF1E4E79)),
+    FOREST("Forest", Color(0xFF2D6A4F)),
+    TEAL("Teal", Color(0xFF0F766E)),
+    INDIGO("Indigo", Color(0xFF3D4C7C)),
+    SLATE("Slate", Color(0xFF475569)),
+    BURGUNDY("Burgundy", Color(0xFF6B3A4A)),
+    GRAPHITE("Graphite", Color(0xFF3D4A54)),
+    OLIVE("Olive", Color(0xFF5C6B3A)),
 }
 
-fun appThemeColorFromName(name: String?): AppThemeColor =
-    AppThemeColor.entries.firstOrNull { it.name == name } ?: AppThemeColor.PURPLE
+fun appThemeColorFromName(name: String?): AppThemeColor {
+    if (name == null) return AppThemeColor.NAVY
+    AppThemeColor.entries.firstOrNull { it.name == name }?.let { return it }
+    return when (name) {
+        "PURPLE", "VIOLET", "COBALT", "BLUE" -> AppThemeColor.NAVY
+        "GREEN", "EMERALD", "LIME" -> AppThemeColor.FOREST
+        "CYAN" -> AppThemeColor.TEAL
+        "ROSE", "RED", "PINK", "MAGENTA" -> AppThemeColor.BURGUNDY
+        "ORANGE", "AMBER" -> AppThemeColor.OLIVE
+        else -> AppThemeColor.NAVY
+    }
+}
 
 /**
- * The three "sensible default" colors free users can pick — Indigo (the app's own out-of-the-box
- * default), Blue, and Green. Every other, brighter color is part of the paid "crazy colors" set,
- * unlocked via the same one-time purchase as [com.alwin.moneymanager.ui.theme.AppThemeStyle.RETRO_LCD].
+ * Light or dark, chosen in Settings. The app does not follow the phone's system theme.
  */
-val FREE_THEME_COLORS = setOf(AppThemeColor.PURPLE, AppThemeColor.COBALT, AppThemeColor.GREEN)
+enum class AppThemeMode(val label: String) {
+    LIGHT("Light"),
+    DARK("Dark"),
+}
+
+fun appThemeModeFromName(name: String?): AppThemeMode =
+    AppThemeMode.entries.firstOrNull { it.name == name } ?: AppThemeMode.LIGHT
 
 /**
  * Overall theme look, orthogonal to [AppThemeColor]. [RETRO_LCD] replaces the whole Material
- * color scheme and typography (calculator/old-phone LCD screen: olive-green background, black
- * text, monospace digits) rather than just swapping the accent color, so it's a separate axis
- * from the color picker instead of one more [AppThemeColor] entry.
+ * color scheme and typography (calculator/old-phone LCD screen) rather than just swapping the
+ * accent color. Retro LCD is always dark; light/dark mode applies to [DEFAULT] only.
  */
 enum class AppThemeStyle(val label: String) {
     DEFAULT("Default"),

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,11 +48,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.alwin.moneymanager.data.local.entity.Emi
+import com.alwin.moneymanager.data.local.entity.EmiPayment
+import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.repository.EmiWithProgress
 import com.alwin.moneymanager.data.repository.HomeSection
+import com.alwin.moneymanager.data.repository.HomeSummary
 import com.alwin.moneymanager.data.repository.RecentExpenseItem
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.emi.EmiProgressRing
@@ -61,6 +67,7 @@ import com.alwin.moneymanager.ui.profile.ProfilePhotoViewerDialog
 import com.alwin.moneymanager.ui.profile.ProfileViewModel
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.ui.theme.LocalIsRetroLcdTheme
+import com.alwin.moneymanager.ui.theme.MoneyManagerTheme
 import com.alwin.moneymanager.util.formatCurrency
 import com.alwin.moneymanager.util.timeOfDayGreeting
 import java.time.Instant
@@ -69,11 +76,10 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// Cards on this screen hardcode a Material-style large corner radius; under Retro LCD that reads
-// as too soft/modern, so swap in the chunkier "plastic key" radius instead of the theme default.
+// macOS-style clean cards with smaller, tighter corner radius for a compact look
 @Composable
 private fun cardShape(defaultCorner: Dp): RoundedCornerShape =
-    if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(defaultCorner)
+    if (LocalIsRetroLcdTheme.current) RoundedCornerShape(6.dp) else RoundedCornerShape(8.dp)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -102,10 +108,60 @@ fun HomeScreen(
     val showRecentActivity by sectionsViewModel.visibility.getValue(HomeSection.RECENT_ACTIVITY).collectAsState()
     val profileName by profileViewModel.name.collectAsState()
     val profilePhotoPath by profileViewModel.photoPath.collectAsState()
+
+    HomeScreenContent(
+        summary = summary,
+        activeEmis = activeEmis,
+        recentActivity = recentActivity,
+        isLoading = isLoading,
+        shouldNudgeBackup = shouldNudgeBackup,
+        showThisMonth = showThisMonth,
+        showPaymentMethod = showPaymentMethod,
+        showEmi = showEmi,
+        showDebts = showDebts,
+        showMonthlyAverage = showMonthlyAverage,
+        showRecentActivity = showRecentActivity,
+        profileName = profileName,
+        profilePhotoPath = profilePhotoPath,
+        onSettingsClick = onSettingsClick,
+        onProfileClick = onProfileClick,
+        onViewAllEmisClick = onViewAllEmisClick,
+        onViewAllExpensesClick = onViewAllExpensesClick,
+        onEmiClick = onEmiClick,
+        onExpenseDateClick = onExpenseDateClick,
+        onSnoozeBackup = backupReminderViewModel::snooze,
+    )
+}
+
+/** Stateless Home UI so it can be exercised from `@Preview` without a Hilt graph. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeScreenContent(
+    summary: HomeSummary,
+    activeEmis: List<EmiWithProgress>,
+    recentActivity: List<RecentExpenseItem>,
+    isLoading: Boolean,
+    shouldNudgeBackup: Boolean,
+    showThisMonth: Boolean,
+    showPaymentMethod: Boolean,
+    showEmi: Boolean,
+    showDebts: Boolean,
+    showMonthlyAverage: Boolean,
+    showRecentActivity: Boolean,
+    profileName: String?,
+    profilePhotoPath: String?,
+    onSettingsClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onViewAllEmisClick: () -> Unit,
+    onViewAllExpensesClick: () -> Unit,
+    onEmiClick: (Long) -> Unit,
+    onExpenseDateClick: (Long) -> Unit,
+    onSnoozeBackup: () -> Unit,
+) {
     var showPhotoViewer by remember { mutableStateOf(false) }
 
     if (showPhotoViewer && profilePhotoPath != null) {
-        ProfilePhotoViewerDialog(photoPath = profilePhotoPath!!, onDismiss = { showPhotoViewer = false })
+        ProfilePhotoViewerDialog(photoPath = profilePhotoPath, onDismiss = { showPhotoViewer = false })
     }
 
     Scaffold(
@@ -148,13 +204,13 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             val hasData = activeEmis.isNotEmpty() || recentActivity.isNotEmpty()
             if (shouldNudgeBackup && hasData) {
                 BackupNudgeCard(
                     onBackUpClick = onSettingsClick,
-                    onDismiss = backupReminderViewModel::snooze,
+                    onDismiss = onSnoozeBackup,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
             }
@@ -167,42 +223,52 @@ fun HomeScreen(
                 )
             }
 
-            val quickStats = buildList {
-                if (showThisMonth) {
-                    add(QuickStat("Today's spend", formatCurrency(summary.todayTotal)))
-                }
-                if (showPaymentMethod) {
-                    add(QuickStat("Credit card", formatCurrency(summary.creditCardThisMonth)))
-                    add(QuickStat("Savings account", formatCurrency(summary.savingsThisMonth)))
-                }
-                if (showEmi) {
-                    add(
-                        QuickStat(
-                            "EMI still due",
-                            formatCurrency(summary.emiDueThisMonth),
-                            emphasize = summary.emiDueThisMonth > 0,
+            val quickStats = remember(
+                summary,
+                showThisMonth,
+                showPaymentMethod,
+                showEmi,
+                showDebts,
+                showMonthlyAverage,
+            ) {
+                buildList {
+                    if (showThisMonth) {
+                        add(QuickStat("Today's spend", formatCurrency(summary.todayTotal)))
+                    }
+                    if (showPaymentMethod) {
+                        add(QuickStat("Credit card", formatCurrency(summary.creditCardThisMonth)))
+                        add(QuickStat("Savings account", formatCurrency(summary.savingsThisMonth)))
+                    }
+                    if (showEmi) {
+                        add(
+                            QuickStat(
+                                "EMI still due",
+                                formatCurrency(summary.emiDueThisMonth),
+                                emphasize = summary.emiDueThisMonth > 0,
+                            )
                         )
-                    )
-                    add(QuickStat("Total outstanding", formatCurrency(summary.totalEmiOutstanding)))
-                }
-                if (showDebts) {
-                    add(QuickStat("Owed to you", formatCurrency(summary.debtToCollect)))
-                    add(QuickStat("You owe", formatCurrency(summary.debtToPay)))
-                }
-                if (showMonthlyAverage) {
-                    add(QuickStat("Avg (expenses)", formatCurrency(summary.monthlyAverageExpenseOnly)))
-                    add(QuickStat("Avg (incl. EMI)", formatCurrency(summary.monthlyAverageIncludingEmi)))
+                        add(QuickStat("Total outstanding", formatCurrency(summary.totalEmiOutstanding)))
+                    }
+                    if (showDebts) {
+                        add(QuickStat("Owed to you", formatCurrency(summary.debtToCollect)))
+                        add(QuickStat("You owe", formatCurrency(summary.debtToPay)))
+                    }
+                    if (showMonthlyAverage) {
+                        add(QuickStat("Avg (expenses)", formatCurrency(summary.monthlyAverageExpenseOnly)))
+                        add(QuickStat("Avg (incl. EMI)", formatCurrency(summary.monthlyAverageIncludingEmi)))
+                    }
                 }
             }
             if (quickStats.isNotEmpty()) {
                 QuickStatsGrid(stats = quickStats, modifier = Modifier.padding(top = 8.dp))
             }
 
-            if (showEmi && activeEmis.isNotEmpty()) {
+            val previewEmis = remember(activeEmis) { activeEmis.take(4) }
+            if (showEmi && previewEmis.isNotEmpty()) {
                 HomeBlock(title = "Active loans", onViewAllClick = onViewAllEmisClick) {
-                    activeEmis.take(4).forEachIndexed { index, item ->
+                    previewEmis.forEachIndexed { index, item ->
                         EmiPreviewRow(item = item, onClick = { onEmiClick(item.emi.id) })
-                        if (index != activeEmis.take(4).lastIndex) HorizontalDivider()
+                        if (index != previewEmis.lastIndex) HorizontalDivider()
                     }
                 }
             }
@@ -219,7 +285,7 @@ fun HomeScreen(
             if (activeEmis.isEmpty() && recentActivity.isEmpty()) {
                 EmptyState(
                     icon = Icons.Filled.Receipt,
-                    title = "Welcome to Money Manager",
+                    title = "Welcome to FinBook",
                     subtitle = "Add your first expense or loan from the tabs below to see it show up here.",
                     modifier = Modifier.padding(top = 24.dp),
                 )
@@ -235,41 +301,44 @@ private fun BackupNudgeCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = cardShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    // macOS-style flat alert banner
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(10.dp)
+            )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.CloudUpload,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Time to back up",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
-                // Default 48dp IconButton keeps the touch target accessible; the glyph itself is
-                // shrunk so it still reads as a small dismiss affordance in the compact card.
                 IconButton(onClick = onDismiss) {
                     Icon(
                         Icons.Filled.Close,
-                        contentDescription = "Dismiss backup reminder",
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        contentDescription = "Dismiss",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }
             }
             Text(
-                "You haven't saved a backup in a while. Export one so you don't lose your data if you change phones.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                "Export a backup or enable Auto backup in Settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
             )
             TextButton(
@@ -282,29 +351,40 @@ private fun BackupNudgeCard(
 
 @Composable
 private fun HeroCard(label: String, value: String, subLabel: String) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        shape = cardShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    // macOS-style flat card with border
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .then(
+                Modifier.background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            )
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LcdAmountText(
                 value,
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 4.dp),
             )
             Text(
                 subLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                modifier = Modifier.padding(top = 6.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -314,27 +394,38 @@ private data class QuickStat(val label: String, val value: String, val emphasize
 
 @Composable
 private fun QuickStatsGrid(stats: List<QuickStat>, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        stats.chunked(2).forEach { rowStats ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                rowStats.forEach { stat -> QuickStatTile(stat, modifier = Modifier.weight(1f)) }
-                if (rowStats.size == 1) Spacer(Modifier.weight(1f))
-            }
+    // macOS-style horizontal scrolling stats
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(stats.size) { index ->
+            QuickStatTile(stats[index])
         }
     }
 }
 
 @Composable
 private fun QuickStatTile(stat: QuickStat, modifier: Modifier = Modifier) {
-    ElevatedCard(
-        modifier = modifier,
-        shape = cardShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // macOS-style flat tile with subtle border
+    Box(
+        modifier = modifier
+            .width(140.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .then(
+                Modifier.background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+            )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 stat.label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -342,7 +433,7 @@ private fun QuickStatTile(stat: QuickStat, modifier: Modifier = Modifier) {
             LcdAmountText(
                 stat.value,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = if (stat.emphasize) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -357,25 +448,35 @@ private fun HomeBlock(
     content: @Composable () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             "View all",
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable(onClick = onViewAllClick),
         )
     }
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = cardShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // macOS-style flat list container
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .then(
+                Modifier.background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            )
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp)) {
             content()
         }
     }
@@ -478,5 +579,113 @@ private fun relativeDayLabel(millis: Long): String {
         today -> "Today"
         today.minusDays(1) -> "Yesterday"
         else -> date.format(shortDateFormatter)
+    }
+}
+
+private val previewSummary = HomeSummary(
+    todayTotal = 450.0,
+    monthExpenseOnly = 18250.0,
+    monthIncludingEmi = 26400.0,
+    monthlyAverageExpenseOnly = 17500.0,
+    monthlyAverageIncludingEmi = 25100.0,
+    emiDueThisMonth = 8150.0,
+    totalEmiOutstanding = 96400.0,
+    creditCardThisMonth = 6200.0,
+    savingsThisMonth = 12050.0,
+    debtToCollect = 2000.0,
+    debtToPay = 500.0,
+)
+
+private val previewActiveEmis = listOf(
+    EmiWithProgress(
+        emi = Emi(id = 1, name = "Car loan", monthlyAmount = 8150.0, totalMonths = 36, startDateMillis = 0),
+        payments = List(10) { EmiPayment(emiId = 1, monthNumber = it + 1, paidDateMillis = 0) },
+    ),
+    EmiWithProgress(
+        emi = Emi(id = 2, name = "Laptop EMI", monthlyAmount = 3200.0, totalMonths = 12, startDateMillis = 0),
+        payments = List(9) { EmiPayment(emiId = 2, monthNumber = it + 1, paidDateMillis = 0) },
+    ),
+)
+
+private val previewRecentActivity = listOf(
+    RecentExpenseItem(
+        expense = Expense(id = 1, categoryId = 1, amount = 450.0, dateMillis = System.currentTimeMillis(), isCreditCard = true),
+        categoryName = "Groceries",
+    ),
+    RecentExpenseItem(
+        expense = Expense(id = 2, categoryId = 2, amount = 1200.0, dateMillis = System.currentTimeMillis() - 86_400_000),
+        categoryName = "Utilities",
+    ),
+    RecentExpenseItem(
+        expense = Expense(id = 3, categoryId = 3, amount = 320.0, dateMillis = System.currentTimeMillis() - 86_400_000),
+        categoryName = "Dining out",
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    MoneyManagerTheme {
+        HomeScreenContent(
+            summary = previewSummary,
+            activeEmis = previewActiveEmis,
+            recentActivity = previewRecentActivity,
+            isLoading = false,
+            shouldNudgeBackup = true,
+            showThisMonth = true,
+            showPaymentMethod = true,
+            showEmi = true,
+            showDebts = true,
+            showMonthlyAverage = true,
+            showRecentActivity = true,
+            profileName = "Alwin",
+            profilePhotoPath = null,
+            onSettingsClick = {},
+            onProfileClick = {},
+            onViewAllEmisClick = {},
+            onViewAllExpensesClick = {},
+            onEmiClick = {},
+            onExpenseDateClick = {},
+            onSnoozeBackup = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Empty state")
+@Composable
+private fun HomeScreenEmptyPreview() {
+    MoneyManagerTheme {
+        HomeScreenContent(
+            summary = previewSummary.copy(
+                todayTotal = 0.0,
+                monthExpenseOnly = 0.0,
+                monthIncludingEmi = 0.0,
+                emiDueThisMonth = 0.0,
+                totalEmiOutstanding = 0.0,
+                creditCardThisMonth = 0.0,
+                savingsThisMonth = 0.0,
+                debtToCollect = 0.0,
+                debtToPay = 0.0,
+            ),
+            activeEmis = emptyList(),
+            recentActivity = emptyList(),
+            isLoading = false,
+            shouldNudgeBackup = false,
+            showThisMonth = true,
+            showPaymentMethod = true,
+            showEmi = true,
+            showDebts = true,
+            showMonthlyAverage = true,
+            showRecentActivity = true,
+            profileName = null,
+            profilePhotoPath = null,
+            onSettingsClick = {},
+            onProfileClick = {},
+            onViewAllEmisClick = {},
+            onViewAllExpensesClick = {},
+            onEmiClick = {},
+            onExpenseDateClick = {},
+            onSnoozeBackup = {},
+        )
     }
 }
