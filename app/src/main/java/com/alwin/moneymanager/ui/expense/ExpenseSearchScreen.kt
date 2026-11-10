@@ -1,6 +1,5 @@
 package com.alwin.moneymanager.ui.expense
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
@@ -67,7 +67,7 @@ fun ExpenseSearchScreen(
                 onValueChange = viewModel::setQuery,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text("Search by note, category, or amount") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { viewModel.setQuery("") }) {
@@ -103,6 +103,7 @@ fun ExpenseSearchScreen(
                             amount = expense.amount,
                             note = expense.note,
                             dateMillis = expense.dateMillis,
+                            isExtra = expense.isExtra,
                             onClick = { onExpenseClick(expense.dateMillis) },
                         )
                     }
@@ -118,28 +119,40 @@ private fun SearchResultRow(
     amount: Double,
     note: String,
     dateMillis: Long,
+    isExtra: Boolean,
     onClick: () -> Unit,
 ) {
     val date = remember(dateMillis) {
         Instant.ofEpochMilli(dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     }
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(categoryName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                if (note.isBlank()) dayHeaderLabel(date) else "$note · ${dayHeaderLabel(date)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    AppListCard(onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(categoryName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(
+                    buildString {
+                        if (note.isNotBlank()) append("$note · ")
+                        append(dayHeaderLabel(date))
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LcdAmountText(
+                formatCurrency(amount),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isExtra) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.extraAmountChip(isExtra),
             )
         }
-        LcdAmountText(
-            formatCurrency(amount),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
     }
 }

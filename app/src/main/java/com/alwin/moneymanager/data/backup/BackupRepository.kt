@@ -86,6 +86,7 @@ class BackupRepository @Inject constructor(
             debtEntries = debtDao.getAllEntriesSnapshot(),
             savings = savingDao.getAllSavingsSnapshot(),
             savingContributions = savingDao.getAllContributionsSnapshot(),
+            savingBuckets = savingDao.getAllBucketsSnapshot(),
         )
         val content = (if (pretty) json else compactJson).encodeToString(export)
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
@@ -116,6 +117,7 @@ class BackupRepository @Inject constructor(
             expenseCategoryDao.deleteAllCategories()
             debtDao.deleteAllDebts()
             savingDao.deleteAllSavings()
+            savingDao.deleteAllBuckets()
             expenseCategoryDao.insertCategories(export.expenseCategories)
             emiDao.insertEmis(export.emis)
             expenseDao.insertExpenses(export.expenses)
@@ -124,6 +126,7 @@ class BackupRepository @Inject constructor(
             debtDao.insertEntries(export.debtEntries)
             savingDao.insertSavings(export.savings)
             savingDao.insertContributions(export.savingContributions)
+            savingDao.insertBuckets(export.savingBuckets)
             resyncAutoIncrementCounters()
         }
 
@@ -149,7 +152,7 @@ class BackupRepository @Inject constructor(
         val db = database.openHelper.writableDatabase
         listOf(
             "emi", "emi_payment", "expense", "expense_category",
-            "debt", "debt_entry", "saving", "saving_contribution",
+            "debt", "debt_entry", "saving", "saving_contribution", "saving_bucket",
         ).forEach { table ->
             db.execSQL(
                 "INSERT OR REPLACE INTO sqlite_sequence(name, seq) " +

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,8 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 import com.alwin.moneymanager.data.repository.SavingWithProgress
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.CelebrationDialog
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import kotlinx.coroutines.launch
@@ -126,10 +129,12 @@ fun SavingDetailScreen(
                     }
                     if (current.contributions.isEmpty()) {
                         item(key = "empty") {
-                            Text(
-                                "No contributions yet.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            EmptyState(
+                                icon = Icons.Filled.Savings,
+                                title = "No contributions yet",
+                                subtitle = "Add money you have put into this pot.",
+                                actionLabel = "Add to savings",
+                                onAction = { showAddContribution = true },
                             )
                         }
                     } else {
@@ -255,21 +260,23 @@ private fun SavingOverviewCard(item: SavingWithProgress) {
 
 @Composable
 private fun ContributionRow(contribution: SavingContribution, dateFormat: DateFormat, onDelete: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            LcdAmountText("+${formatCurrency(contribution.amount)}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                dateFormat.format(Date(contribution.dateMillis)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Remove contribution", tint = MaterialTheme.colorScheme.error)
+    AppListCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                LcdAmountText("+${formatCurrency(contribution.amount)}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(
+                    dateFormat.format(Date(contribution.dateMillis)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = "Remove contribution", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

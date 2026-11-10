@@ -1,9 +1,25 @@
 package com.alwin.moneymanager.ui.expense
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.dp
+
+/** Soft theme chip behind an extra amount, so it matches the app and stays easy to spot. */
+@Composable
+fun Modifier.extraAmountChip(isExtra: Boolean): Modifier {
+    if (!isExtra) return this
+    return this
+        .clip(RoundedCornerShape(8.dp))
+        .background(MaterialTheme.colorScheme.primaryContainer)
+        .padding(horizontal = 8.dp, vertical = 2.dp)
+}
 
 /** 
  * Returns a deterministic color for each category based on the current theme's primary color.

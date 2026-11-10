@@ -30,6 +30,12 @@ interface ExpenseDao {
 
     @Query(
         "SELECT COALESCE(SUM(amount), 0) FROM expense " +
+            "WHERE dateMillis >= :startMillis AND dateMillis < :endMillis AND isExtra = 1"
+    )
+    fun getExtraTotalForPeriod(startMillis: Long, endMillis: Long): Flow<Double>
+
+    @Query(
+        "SELECT COALESCE(SUM(amount), 0) FROM expense " +
             "WHERE categoryId = :categoryId AND dateMillis >= :startMillis AND dateMillis < :endMillis"
     )
     fun getExpenseTotalForCategoryAndPeriod(categoryId: Long, startMillis: Long, endMillis: Long): Flow<Double>

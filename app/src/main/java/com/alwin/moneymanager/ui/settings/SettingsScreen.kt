@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -62,8 +63,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -497,7 +500,8 @@ private fun CurrencyChip(type: CurrencyType, isSelected: Boolean, onClick: () ->
     Row(
         modifier = Modifier
             .background(backgroundColor, MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -515,7 +519,7 @@ private fun ColorSwatch(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .background(color.seed, CircleShape)
                 .then(
                     if (isSelected) {
@@ -528,7 +532,8 @@ private fun ColorSwatch(
             contentAlignment = Alignment.Center,
         ) {
             if (isSelected) {
-                Icon(Icons.Filled.Check, contentDescription = color.label, tint = Color.White)
+                val mark = if (color.seed.luminance() > 0.62f) Color.Black else Color.White
+                Icon(Icons.Filled.Check, contentDescription = color.label, tint = mark)
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -553,7 +558,11 @@ private fun SettingRow(
     enabled: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .clickable(enabled = enabled, role = Role.Switch) { onCheckedChange(!checked) }
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -564,7 +573,7 @@ private fun SettingRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -577,7 +586,10 @@ private fun ActionRow(
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

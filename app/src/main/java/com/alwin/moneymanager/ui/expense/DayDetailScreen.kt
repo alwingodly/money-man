@@ -1,7 +1,6 @@
 package com.alwin.moneymanager.ui.expense
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.Expense
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
@@ -62,6 +60,7 @@ fun DayDetailScreen(
     val categories by viewModel.categories.collectAsState()
     val categoryNameById = remember(categories) { categories.associate { it.id to it.name } }
     val total = expenses.sumOf { it.amount }
+    val extraTotal = expenses.filter { it.isExtra }.sumOf { it.amount }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
 
@@ -117,6 +116,13 @@ fun DayDetailScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
+                    if (extraTotal > 0) {
+                        Text(
+                            "Extra included ${formatCurrency(extraTotal)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
                 }
             }
 
@@ -150,8 +156,8 @@ fun DayDetailScreen(
             categories = categories,
             existing = expense,
             onDismiss = { editingExpense = null },
-            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard ->
-                viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard)
+            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard, isExtra ->
+                viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard, isExtra)
                 editingExpense = null
             },
             onDelete = { expensePendingDelete = expense },
@@ -179,19 +185,20 @@ private fun DayExpenseRow(
     categoryName: String,
     onEditClick: () -> Unit,
 ) {
-    // macOS-style flat expense row
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onEditClick)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(8.dp)
-            )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+    AppListCard(onClick = onEditClick) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                LcdAmountText(
+                    formatCurrency(expense.amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (expense.isExtra) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.extraAmountChip(expense.isExtra),
+                )
                 if (expense.isCreditCard) {
                     Icon(
                         Icons.Filled.CreditCard,

@@ -1,6 +1,5 @@
 package com.alwin.moneymanager.ui.emi
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -26,9 +23,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.alwin.moneymanager.ui.common.AppAddFab
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
+import com.alwin.moneymanager.ui.common.AppListCard
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import java.time.Instant
@@ -95,9 +93,10 @@ fun ChittiDetailScreen(
         },
         floatingActionButton = {
             if (chittiWithProgress != null && chittiWithProgress!!.remainingMonths > 0) {
-                FloatingActionButton(onClick = { showAddPaymentDialog = true }) {
-                    Icon(Icons.Filled.Add, "Add Payment")
-                }
+                AppAddFab(
+                    contentDescription = "Add payment",
+                    onClick = { showAddPaymentDialog = true },
+                )
             }
         },
     ) { padding ->
@@ -201,22 +200,13 @@ fun ChittiDetailScreen(
 
                 if (item.payments.isEmpty()) {
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "No payments yet.\nTap + to add first payment.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        EmptyState(
+                            icon = Icons.Filled.Edit,
+                            title = "No payments yet",
+                            subtitle = "Add the first payment for this chitti.",
+                            actionLabel = "Add payment",
+                            onAction = { showAddPaymentDialog = true },
+                        )
                     }
                 } else {
                     items(sortedPayments, key = { it.id }) { payment ->
@@ -330,15 +320,7 @@ private fun PaymentRow(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(16.dp)
-    ) {
+    AppListCard(onClick = onEdit) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -377,8 +359,7 @@ private fun PaymentRow(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         Icons.Filled.MoreVert,
-                        contentDescription = "Options",
-                        modifier = Modifier.padding(start = 8.dp)
+                        contentDescription = "More options for month ${payment.monthNumber}",
                     )
                 }
                 DropdownMenu(
@@ -418,6 +399,7 @@ private fun AddPaymentDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = AppFormDialogProperties,
         title = { Text("Add Payment - Month $nextMonth") },
         text = {
             Column {
@@ -465,6 +447,7 @@ private fun MarkReceivedDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = AppFormDialogProperties,
         title = { Text("Mark Chitti Received") },
         text = {
             Column {
@@ -510,6 +493,7 @@ private fun EditPaymentDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = AppFormDialogProperties,
         title = { Text("Edit Payment - Month ${payment.monthNumber}") },
         text = {
             Column {
@@ -559,6 +543,7 @@ private fun EditChittiDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = AppFormDialogProperties,
         title = { Text("Edit Chitti") },
         text = {
             Column {

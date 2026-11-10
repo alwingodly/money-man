@@ -23,6 +23,7 @@ enum class SummaryMode { MONTH, YEAR }
 data class PeriodSummary(
     val label: String,
     val total: Double,
+    val extraTotal: Double,
     val count: Int,
     val sortKey: Long,
     val categoryBreakdown: List<CategoryTotal>,
@@ -53,14 +54,23 @@ class ExpenseSummaryViewModel @Inject constructor(
                 PeriodSummary(
                     label = periodLabel(key, mode),
                     total = items.sumOf { it.amount },
+                    extraTotal = items.filter { it.isExtra }.sumOf { it.amount },
                     count = items.size,
                     sortKey = key,
-                    categoryBreakdown = items
-                        .groupBy { it.categoryId }
-                        .map { (categoryId, list) ->
-                            CategoryTotal(categoryId, nameById[categoryId] ?: "Unknown", list.sumOf { it.amount })
+                    categoryBreakdown = run {
+                        val spent = items.groupBy { it.categoryId }
+                            .mapValues { (_, list) -> list.sumOf { it.amount } }
+                        val knownIds = categories.map { it.id }.toSet()
+                        val known = categories.map { category ->
+                            CategoryTotal(category.id, category.name, spent[category.id] ?: 0.0)
                         }
-                        .sortedByDescending { it.amount },
+                        val unknown = spent
+                            .filterKeys { it !in knownIds }
+                            .map { (categoryId, amount) ->
+                                CategoryTotal(categoryId, nameById[categoryId] ?: "Unknown", amount)
+                            }
+                        (known + unknown).sortedByDescending { it.amount }
+                    },
                 )
             }
             .sortedByDescending { it.sortKey }

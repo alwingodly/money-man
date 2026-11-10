@@ -22,22 +22,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,6 +67,8 @@ import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
+import com.alwin.moneymanager.ui.common.AppAddFab
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
@@ -95,6 +93,7 @@ fun ExpenseScreen(
 ) {
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var showReorderDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
@@ -109,6 +108,7 @@ fun ExpenseScreen(
     val selectedCategory = categories.find { it.id == selectedCategoryId }
 
     val total = remember(expenses) { expenses.sumOf { it.amount } }
+    val extraTotal = remember(expenses) { expenses.filter { it.isExtra }.sumOf { it.amount } }
     val expensesByDay = remember(expenses) { groupExpensesByDay(expenses) }
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -157,22 +157,28 @@ fun ExpenseScreen(
                                     },
                                 )
                             }
+                            if (categories.size > 1) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Reorder categories") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showReorderDialog = true
+                                    },
+                                )
+                            }
                         }
                     }
                 },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                // Always actionable: with no categories yet, "+" starts by creating one; otherwise
-                // it opens the add-expense dialog (which now has its own category picker).
+            AppAddFab(
+                contentDescription = if (categories.isEmpty()) "Add category" else "Add expense",
                 onClick = {
                     if (categories.isEmpty()) showAddCategoryDialog = true else showAddExpenseDialog = true
                 },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add expense")
-            }
+            )
         },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -186,8 +192,8 @@ fun ExpenseScreen(
 
             TotalSummaryCard(
                 total = total,
+                extraTotal = extraTotal,
                 periodFilter = periodFilter,
-                onShiftPeriod = viewModel::shiftPeriodBy,
                 selectedCategory = selectedCategory,
                 spentThisMonth = currentMonthSpendForSelected,
             )
@@ -204,6 +210,8 @@ fun ExpenseScreen(
                         title = "No categories yet",
                         subtitle = "Add a category (like Food or Travel) to start tracking your spending.",
                         modifier = Modifier.fillMaxSize(),
+                        actionLabel = "Add category",
+                        onAction = { showAddCategoryDialog = true },
                     )
                 }
                 expenses.isEmpty() -> {
@@ -212,6 +220,8 @@ fun ExpenseScreen(
                         title = "Nothing here yet",
                         subtitle = "Expenses you add for this period will show up here.",
                         modifier = Modifier.fillMaxSize(),
+                        actionLabel = "Add expense",
+                        onAction = { showAddExpenseDialog = true },
                     )
                 }
                 periodFilter.granularity == PeriodGranularity.DAY -> {
@@ -240,6 +250,7 @@ fun ExpenseScreen(
                                 DayHeader(
                                     date = date,
                                     subtotal = dayExpenses.sumOf { it.amount },
+                                    extra = dayExpenses.filter { it.isExtra }.sumOf { it.amount },
                                 )
                             }
                             items(dayExpenses, key = { it.id }) { expense ->
@@ -262,8 +273,8 @@ fun ExpenseScreen(
             categories = categories,
             initialCategoryId = selectedCategoryId,
             onDismiss = { showAddExpenseDialog = false },
-            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard ->
-                viewModel.addExpense(categoryId, amount, note, dateMillis, isCreditCard)
+            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard, isExtra ->
+                viewModel.addExpense(categoryId, amount, note, dateMillis, isCreditCard, isExtra)
                 showAddExpenseDialog = false
             },
         )
@@ -274,8 +285,8 @@ fun ExpenseScreen(
             categories = categories,
             existing = expense,
             onDismiss = { editingExpense = null },
-            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard ->
-                viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard)
+            onConfirm = { categoryId, amount, note, dateMillis, isCreditCard, isExtra ->
+                viewModel.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard, isExtra)
                 editingExpense = null
             },
             onDelete = { expensePendingDelete = expense },
@@ -292,6 +303,14 @@ fun ExpenseScreen(
                 onDeleteExpense(expense)
             },
             onDismiss = { expensePendingDelete = null },
+        )
+    }
+
+    if (showReorderDialog) {
+        ReorderCategoriesDialog(
+            categories = categories,
+            onMove = viewModel::moveCategory,
+            onDismiss = { showReorderDialog = false },
         )
     }
 
@@ -386,7 +405,7 @@ private fun FilterPanel(
                             Icons.Filled.Edit,
                             contentDescription = "Edit ${category.name}",
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(16.dp).clickable { onEditCategoryClick(category) },
+                            modifier = Modifier.size(20.dp).clickable { onEditCategoryClick(category) },
                         )
                     }
                 } else null,
@@ -401,7 +420,10 @@ private fun FilterPanel(
             FilterChip(
                 selected = false,
                 onClick = onAddCategoryClick,
-                label = { Icon(Icons.Filled.Add, contentDescription = "Add category", modifier = Modifier.size(18.dp)) },
+                leadingIcon = {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                label = { Text("Add") },
             )
         }
     }
@@ -410,36 +432,25 @@ private fun FilterPanel(
 @Composable
 private fun TotalSummaryCard(
     total: Double,
+    extraTotal: Double,
     periodFilter: PeriodFilter,
-    onShiftPeriod: (Int) -> Unit,
     selectedCategory: ExpenseCategory?,
     spentThisMonth: Double,
 ) {
-    val showNav = periodFilter.granularity != PeriodGranularity.ALL
     val budget = selectedCategory?.budgetLimit
-    
-    // Clean minimal design with primary color emphasis
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (showNav) {
-            IconButton(onClick = { onShiftPeriod(-1) }) {
-                Icon(
-                    Icons.Filled.ChevronLeft,
-                    contentDescription = "Previous period",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
         Column(
-            modifier = Modifier.weight(1f), 
-            horizontalAlignment = if (showNav) Alignment.CenterHorizontally else Alignment.Start
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.Start,
         ) {
             Text(
-                if (showNav) periodLabel(periodFilter) else "Total",
+                periodLabel(periodFilter),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -449,6 +460,13 @@ private fun TotalSummaryCard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
+            if (extraTotal > 0) {
+                Text(
+                    "Extra included ${formatCurrency(extraTotal)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (budget != null) {
             val remaining = budget - spentThisMonth
@@ -475,20 +493,11 @@ private fun TotalSummaryCard(
                 )
             }
         }
-        if (showNav) {
-            IconButton(onClick = { onShiftPeriod(1) }) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = "Next period",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
     }
 }
 
 @Composable
-private fun DayHeader(date: LocalDate, subtotal: Double) {
+private fun DayHeader(date: LocalDate, subtotal: Double, extra: Double) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -499,12 +508,21 @@ private fun DayHeader(date: LocalDate, subtotal: Double) {
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LcdAmountText(
-            formatCurrency(subtotal),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            LcdAmountText(
+                formatCurrency(subtotal),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (extra > 0) {
+                Text(
+                    "Extra included ${formatCurrency(extra)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -516,14 +534,20 @@ private fun ExpenseRow(
     modifier: Modifier = Modifier,
 ) {
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
-    Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onEditClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    AppListCard(onClick = onEditClick, modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                LcdAmountText(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                LcdAmountText(
+                    formatCurrency(expense.amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (expense.isExtra) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.extraAmountChip(expense.isExtra),
+                )
                 if (expense.isCreditCard) {
                     Icon(
                         Icons.Filled.CreditCard,
@@ -533,7 +557,6 @@ private fun ExpenseRow(
                     )
                 }
             }
-            // Always show a title (note or default "Expense")
             Text(
                 if (expense.note.isNotBlank()) expense.note else "Expense",
                 style = MaterialTheme.typography.bodyMedium,

@@ -53,4 +53,11 @@ class ProfileRepository @Inject constructor(
         }
         dataStore.edit { prefs -> prefs[PROFILE_PHOTO_PATH_KEY] = file.absolutePath }
     }
+
+    suspend fun clearPhoto() {
+        dataStore.edit { prefs -> prefs.remove(PROFILE_PHOTO_PATH_KEY) }
+        withContext(Dispatchers.IO) {
+            File(context.filesDir, "profile_photo.jpg").delete()
+        }
+    }
 }

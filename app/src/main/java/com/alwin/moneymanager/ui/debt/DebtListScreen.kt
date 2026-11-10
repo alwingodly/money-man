@@ -1,7 +1,6 @@
 package com.alwin.moneymanager.ui.debt
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.repository.DebtWithProgress
+import com.alwin.moneymanager.ui.common.AppAddFab
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
@@ -73,9 +71,7 @@ fun DebtListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add debt")
-            }
+            AppAddFab(contentDescription = "Add debt", onClick = { showAddDialog = true })
         },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -86,7 +82,7 @@ fun DebtListScreen(
                 onValueChange = viewModel::setQuery,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 placeholder = { Text("Search by name or note") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { viewModel.setQuery("") }) {
@@ -107,8 +103,10 @@ fun DebtListScreen(
                     EmptyState(
                         icon = Icons.Filled.Add,
                         title = "No debts yet",
-                        subtitle = "Tap + to note money you'll get back or need to give — like a debt book that never gets lost.",
+                        subtitle = "Note money you'll get back or need to give — like a debt book that never gets lost.",
                         modifier = Modifier.fillMaxSize(),
+                        actionLabel = "Add debt",
+                        onAction = { showAddDialog = true },
                     )
                 }
                 debts.isEmpty() -> {
@@ -204,18 +202,9 @@ internal fun DebtRow(item: DebtWithProgress, onClick: () -> Unit) {
     val debt = item.debt
     val owesYou = item.netBalance > 0
     val accent = if (owesYou) getColor() else MaterialTheme.colorScheme.error
-    // macOS-style flat row
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
-            )
-    ) {
+    AppListCard(onClick = onClick) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -229,7 +218,6 @@ internal fun DebtRow(item: DebtWithProgress, onClick: () -> Unit) {
                     )
                 }
             }
-            // Signed + colour-coded: green "+" = they owe you, red "−" = you owe them.
             LcdAmountText(
                 (if (owesYou) "+" else "−") + formatCurrency(item.outstanding),
                 style = MaterialTheme.typography.titleMedium,
@@ -238,7 +226,7 @@ internal fun DebtRow(item: DebtWithProgress, onClick: () -> Unit) {
             )
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
+                contentDescription = "Open ${debt.personName}",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

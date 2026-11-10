@@ -28,9 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import com.alwin.moneymanager.data.local.entity.Emi
 import com.alwin.moneymanager.data.local.entity.EmiFrequency
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
 import com.alwin.moneymanager.ui.common.DateField
 import com.alwin.moneymanager.util.calendarMonthsInclusive
 import com.alwin.moneymanager.util.emiEndDate
@@ -130,7 +130,7 @@ fun EmiFormDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = AppFormDialogProperties,
         title = { Text(title) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {

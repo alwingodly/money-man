@@ -18,16 +18,17 @@ import com.alwin.moneymanager.data.local.entity.EmiPayment
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import com.alwin.moneymanager.data.local.entity.Saving
+import com.alwin.moneymanager.data.local.entity.SavingBucket
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 
 @Database(
     entities = [
         Emi::class, EmiPayment::class, Expense::class, ExpenseCategory::class,
         Debt::class, DebtEntry::class,
-        Saving::class, SavingContribution::class,
+        Saving::class, SavingContribution::class, SavingBucket::class,
         Chitti::class, ChittiPayment::class,
     ],
-    version = 17,
+    version = 20,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

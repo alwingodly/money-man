@@ -2,6 +2,7 @@ package com.alwin.moneymanager.data.repository
 
 import com.alwin.moneymanager.data.local.dao.SavingDao
 import com.alwin.moneymanager.data.local.entity.Saving
+import com.alwin.moneymanager.data.local.entity.SavingBucket
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -100,6 +101,23 @@ class SavingRepository @Inject constructor(
         savingDao.insertContribution(contribution.copy(id = 0))
         refreshAchieved(saving)
     }
+
+    fun getAllBuckets(): Flow<List<SavingBucket>> = savingDao.getAllBuckets()
+
+    suspend fun addBucket(name: String, amount: Double, note: String) {
+        savingDao.insertBucket(
+            SavingBucket(
+                name = name,
+                amount = amount,
+                note = note,
+                createdDateMillis = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun updateBucket(bucket: SavingBucket) = savingDao.updateBucket(bucket)
+
+    suspend fun deleteBucket(bucket: SavingBucket) = savingDao.deleteBucket(bucket)
 
     private suspend fun refreshAchieved(saving: Saving) {
         val target = saving.targetAmount ?: return

@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.DebtEntry
 import com.alwin.moneymanager.data.repository.DebtWithProgress
+import com.alwin.moneymanager.ui.common.AppListCard
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
+import com.alwin.moneymanager.ui.common.EmptyState
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.util.formatCurrency
 import kotlinx.coroutines.launch
@@ -122,10 +124,10 @@ fun DebtDetailScreen(
                     }
                     if (current.entries.isEmpty()) {
                         item(key = "empty") {
-                            Text(
-                                "No entries yet.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            EmptyState(
+                                icon = Icons.Filled.Edit,
+                                title = "No entries yet",
+                                subtitle = "Record money you gave or got using the buttons below.",
                             )
                         }
                     } else {
@@ -330,33 +332,35 @@ private fun EntryRow(
     val label = if (entry.isGiven) "You gave" else "You got"
     val sign = if (entry.isGiven) "+" else "−"
     val amountColor: Color = if (entry.isGiven) getColor() else MaterialTheme.colorScheme.error
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Icon(
-            if (entry.isGiven) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-            contentDescription = null,
-            tint = amountColor,
-            modifier = Modifier.padding(end = 10.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                dateFormat.format(Date(entry.dateMillis)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    AppListCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                if (entry.isGiven) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                contentDescription = label,
+                tint = amountColor,
+                modifier = Modifier.padding(end = 10.dp),
             )
-        }
-        LcdAmountText(
-            "$sign${formatCurrency(entry.amount)}",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = amountColor,
-        )
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(
+                    dateFormat.format(Date(entry.dateMillis)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LcdAmountText(
+                "$sign${formatCurrency(entry.amount)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = amountColor,
+            )
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

@@ -169,11 +169,24 @@ fun MoneyManagerNavHost(
                         navController.navigate(Destination.ExpenseDayDetail.createRoute(dateMillis))
                     },
                     onSearchClick = { navController.navigate(Destination.ExpenseSearch.route) },
-                    onSummaryClick = { navController.navigate(Destination.ExpenseSummary.route) },
+                    onSummaryClick = {
+                        navController.navigate(Destination.ExpenseSummary.createRoute(chart = true))
+                    },
                 )
             }
-            composable(Destination.ExpenseSummary.route) {
-                ExpenseSummaryScreen(onBack = { navController.popBackStack() })
+            composable(
+                route = Destination.ExpenseSummary.route,
+                arguments = listOf(
+                    navArgument("chart") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+            ) { entry ->
+                ExpenseSummaryScreen(
+                    onBack = { navController.popBackStack() },
+                    startOnChart = entry.arguments?.getBoolean("chart") == true,
+                )
             }
             composable(Destination.ExpenseSearch.route) {
                 ExpenseSearchScreen(

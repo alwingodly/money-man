@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.alwin.moneymanager.data.local.entity.EmiFrequency
 import com.alwin.moneymanager.data.repository.EmiWithProgress
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
 import com.alwin.moneymanager.ui.common.ConfirmDeleteDialog
 import com.alwin.moneymanager.ui.theme.LcdAmountText
 import com.alwin.moneymanager.ui.theme.LocalIsRetroLcdTheme
@@ -248,6 +249,7 @@ fun EmiDetailScreen(
         val penaltyValue = penaltyText.toDoubleOrNull()
         AlertDialog(
             onDismissRequest = { showPenaltyPrompt = false },
+            properties = AppFormDialogProperties,
             title = { Text("Paid after due date") },
             text = {
                 Column {

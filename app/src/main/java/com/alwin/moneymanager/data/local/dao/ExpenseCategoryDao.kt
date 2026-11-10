@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ExpenseCategoryDao {
 
-    @Query("SELECT * FROM expense_category ORDER BY name ASC")
+    @Query("SELECT * FROM expense_category ORDER BY sortOrder ASC, name ASC")
     fun getAllCategories(): Flow<List<ExpenseCategory>>
 
     @Insert
@@ -19,8 +19,14 @@ interface ExpenseCategoryDao {
     @Update
     suspend fun updateCategory(category: ExpenseCategory)
 
-    @Query("SELECT * FROM expense_category")
+    @Query("SELECT * FROM expense_category ORDER BY sortOrder ASC, name ASC")
     suspend fun getAllCategoriesSnapshot(): List<ExpenseCategory>
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) FROM expense_category")
+    suspend fun maxSortOrder(): Int
+
+    @Query("UPDATE expense_category SET sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
     @Insert
     suspend fun insertCategories(categories: List<ExpenseCategory>)

@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
 import com.alwin.moneymanager.ui.common.DateField
 import com.alwin.moneymanager.util.currentCurrency
 
@@ -34,7 +34,7 @@ fun AddContributionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = AppFormDialogProperties,
         title = { Text("Add to savings") },
         text = {
             Column {

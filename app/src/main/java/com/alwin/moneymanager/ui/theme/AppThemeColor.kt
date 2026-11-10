@@ -16,6 +16,13 @@ enum class AppThemeColor(val label: String, val seed: Color) {
     BURGUNDY("Burgundy", Color(0xFF6B3A4A)),
     GRAPHITE("Graphite", Color(0xFF3D4A54)),
     OLIVE("Olive", Color(0xFF5C6B3A)),
+    SKY("Sky", Color(0xFF3B82F6)),
+    MINT("Mint", Color(0xFF22C55E)),
+    AMBER("Amber", Color(0xFFF59E0B)),
+    CORAL("Coral", Color(0xFFF97316)),
+    LILAC("Lilac", Color(0xFFA855F7)),
+    AQUA("Aqua", Color(0xFF06B6D4)),
+    ROSE("Rose", Color(0xFFF43F5E)),
 }
 
 fun appThemeColorFromName(name: String?): AppThemeColor {

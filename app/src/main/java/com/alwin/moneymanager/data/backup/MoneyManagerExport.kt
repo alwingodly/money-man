@@ -7,6 +7,7 @@ import com.alwin.moneymanager.data.local.entity.EmiPayment
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
 import com.alwin.moneymanager.data.local.entity.Saving
+import com.alwin.moneymanager.data.local.entity.SavingBucket
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 import kotlinx.serialization.Serializable
 
@@ -30,6 +31,7 @@ data class MoneyManagerExport(
     val debtEntries: List<DebtEntry> = emptyList(),
     val savings: List<Saving> = emptyList(),
     val savingContributions: List<SavingContribution> = emptyList(),
+    val savingBuckets: List<SavingBucket> = emptyList(),
 ) {
     companion object {
         // Intentionally left at 1 even though debt fields were added: the new fields have safe

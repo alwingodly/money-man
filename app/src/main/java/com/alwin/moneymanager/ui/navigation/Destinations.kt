@@ -22,7 +22,9 @@ sealed class Destination(val route: String) {
     }
     data object Expenses : Destination("expenses")
     data object ExpenseSearch : Destination("expense_search")
-    data object ExpenseSummary : Destination("expense_summary")
+    data object ExpenseSummary : Destination("expense_summary?chart={chart}") {
+        fun createRoute(chart: Boolean = false) = "expense_summary?chart=$chart"
+    }
     data object ExpenseDayDetail : Destination("expense_day/{dateMillis}") {
         const val ARG_DATE_MILLIS = "dateMillis"
         fun createRoute(dateMillis: Long) = "expense_day/$dateMillis"

@@ -5,6 +5,32 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 private const val MILLIS_PER_MONTH = 30L * 24 * 60 * 60 * 1000
 
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE expense_category ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE expense ADD COLUMN isExtra INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `saving_bucket` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, " +
+                "`amount` REAL NOT NULL, " +
+                "`note` TEXT NOT NULL, " +
+                "`isDone` INTEGER NOT NULL, " +
+                "`createdDateMillis` INTEGER NOT NULL)"
+        )
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add frequency column to chitti table

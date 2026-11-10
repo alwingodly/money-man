@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.alwin.moneymanager.data.local.entity.ChittiFrequency
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
 import java.time.Instant
 
 data class ChittiForm(
@@ -46,6 +47,7 @@ fun AddChittiDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = AppFormDialogProperties,
         title = { Text("Add Chitti") },
         text = {
             Column {

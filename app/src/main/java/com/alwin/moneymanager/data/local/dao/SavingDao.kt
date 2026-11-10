@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.alwin.moneymanager.data.local.entity.Saving
+import com.alwin.moneymanager.data.local.entity.SavingBucket
 import com.alwin.moneymanager.data.local.entity.SavingContribution
 import kotlinx.coroutines.flow.Flow
 
@@ -58,4 +59,25 @@ interface SavingDao {
     /** Cascades to `saving_contribution` via the FK's `ON DELETE CASCADE`. */
     @Query("DELETE FROM saving")
     suspend fun deleteAllSavings()
+
+    @Query("SELECT * FROM saving_bucket ORDER BY isDone ASC, createdDateMillis DESC")
+    fun getAllBuckets(): Flow<List<SavingBucket>>
+
+    @Query("SELECT * FROM saving_bucket")
+    suspend fun getAllBucketsSnapshot(): List<SavingBucket>
+
+    @Insert
+    suspend fun insertBucket(bucket: SavingBucket): Long
+
+    @Update
+    suspend fun updateBucket(bucket: SavingBucket)
+
+    @Delete
+    suspend fun deleteBucket(bucket: SavingBucket)
+
+    @Insert
+    suspend fun insertBuckets(buckets: List<SavingBucket>)
+
+    @Query("DELETE FROM saving_bucket")
+    suspend fun deleteAllBuckets()
 }

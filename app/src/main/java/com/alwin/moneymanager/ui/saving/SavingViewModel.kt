@@ -2,6 +2,7 @@ package com.alwin.moneymanager.ui.saving
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.alwin.moneymanager.data.local.entity.SavingBucket
 import com.alwin.moneymanager.data.repository.SavingRepository
 import com.alwin.moneymanager.data.repository.SavingWithProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,9 +34,36 @@ class SavingViewModel @Inject constructor(
         .map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val buckets: StateFlow<List<SavingBucket>> = repository.getAllBuckets()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun addSaving(form: SavingFormResult) {
         viewModelScope.launch {
             repository.addSaving(name = form.name, targetAmount = form.targetAmount, note = form.note)
         }
+    }
+
+    fun addBucket(form: BucketFormResult) {
+        viewModelScope.launch {
+            repository.addBucket(name = form.name, amount = form.amount, note = form.note)
+        }
+    }
+
+    fun updateBucket(bucket: SavingBucket, form: BucketFormResult) {
+        viewModelScope.launch {
+            repository.updateBucket(
+                bucket.copy(name = form.name, amount = form.amount, note = form.note),
+            )
+        }
+    }
+
+    fun setBucketDone(bucket: SavingBucket, done: Boolean) {
+        viewModelScope.launch {
+            repository.updateBucket(bucket.copy(isDone = done))
+        }
+    }
+
+    fun deleteBucket(bucket: SavingBucket) {
+        viewModelScope.launch { repository.deleteBucket(bucket) }
     }
 }

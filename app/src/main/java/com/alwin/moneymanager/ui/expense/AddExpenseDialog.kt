@@ -33,12 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import com.alwin.moneymanager.data.local.entity.Expense
 import com.alwin.moneymanager.data.local.entity.ExpenseCategory
+import com.alwin.moneymanager.ui.common.AppFormDialogProperties
 import com.alwin.moneymanager.ui.common.DateField
 import com.alwin.moneymanager.util.currentCurrency
 
@@ -47,7 +48,7 @@ import com.alwin.moneymanager.util.currentCurrency
 fun AddExpenseDialog(
     categories: List<ExpenseCategory>,
     onDismiss: () -> Unit,
-    onConfirm: (categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) -> Unit,
+    onConfirm: (categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean, isExtra: Boolean) -> Unit,
     initialCategoryId: Long? = null,
     existing: Expense? = null,
     onDelete: (() -> Unit)? = null,
@@ -56,6 +57,7 @@ fun AddExpenseDialog(
     var note by remember { mutableStateOf(existing?.note ?: "") }
     var dateMillis by remember { mutableStateOf(existing?.dateMillis ?: System.currentTimeMillis()) }
     var isCreditCard by remember { mutableStateOf(existing?.isCreditCard ?: false) }
+    var isExtra by remember { mutableStateOf(existing?.isExtra ?: false) }
     var categoryId by remember {
         mutableStateOf(existing?.categoryId ?: initialCategoryId ?: categories.firstOrNull()?.id)
     }
@@ -67,7 +69,7 @@ fun AddExpenseDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = AppFormDialogProperties,
         title = { Text(if (isEditing) "Edit expense" else "Add expense") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -124,6 +126,14 @@ fun AddExpenseDialog(
                     Text("Paid by credit card")
                     Switch(checked = isCreditCard, onCheckedChange = { isCreditCard = it })
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Extra")
+                    Switch(checked = isExtra, onCheckedChange = { isExtra = it })
+                }
                 if (isEditing && onDelete != null) {
                     HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
                     TextButton(
@@ -145,7 +155,7 @@ fun AddExpenseDialog(
         confirmButton = {
             TextButton(
                 enabled = isValid,
-                onClick = { onConfirm(categoryId!!, amountValue!!, note.trim(), dateMillis, isCreditCard) },
+                onClick = { onConfirm(categoryId!!, amountValue!!, note.trim(), dateMillis, isCreditCard, isExtra) },
             ) { Text(if (isEditing) "Save" else "Add") }
         },
         dismissButton = {

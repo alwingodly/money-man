@@ -29,4 +29,7 @@ data class Expense(
     val dateMillis: Long,
     @ColumnInfo(defaultValue = "0")
     val isCreditCard: Boolean = false,
+    /** Spend that is still part of the totals, and also shown on its own on Home. */
+    @ColumnInfo(defaultValue = "0")
+    val isExtra: Boolean = false,
 )

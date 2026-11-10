@@ -2,11 +2,12 @@ package com.alwin.moneymanager.ui.common
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,9 +23,9 @@ import androidx.compose.ui.unit.dp
 /**
  * Plain-language "nothing here yet" placeholder, used instead of a blank screen wherever a list
  * can be empty. [title] states what's missing in everyday words, [subtitle] tells the user what
- * to do about it (or what will show up here once they do). Pass `Modifier.fillMaxSize()` when
- * this is the sole content of a screen; the default only fills width, so it's also safe to drop
- * inline into a scrollable column (fillMaxSize there would crash on unbounded height).
+ * to do about it. [actionLabel] + [onAction] make the next step visible — don't rely on the FAB
+ * alone. Pass `Modifier.fillMaxSize()` when this is the sole content of a screen; the default
+ * only fills width, so it's also safe to drop inline into a scrollable column.
  */
 @Composable
 fun EmptyState(
@@ -31,7 +33,10 @@ fun EmptyState(
     title: String,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier = modifier.fillMaxWidth().padding(32.dp),
         contentAlignment = Alignment.Center,
@@ -58,6 +63,17 @@ fun EmptyState(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
+            }
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        haptics.confirmAction()
+                        onAction()
+                    },
+                ) {
+                    Text(actionLabel)
+                }
             }
         }
     }

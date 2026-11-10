@@ -31,7 +31,7 @@ class ExpenseViewModel @Inject constructor(
     private val _selectedCategoryId = MutableStateFlow<Long?>(null)
     val selectedCategoryId: StateFlow<Long?> = _selectedCategoryId.asStateFlow()
 
-    private val _periodFilter = MutableStateFlow(PeriodFilter(PeriodGranularity.ALL))
+    private val _periodFilter = MutableStateFlow(PeriodFilter(PeriodGranularity.MONTH))
     val periodFilter: StateFlow<PeriodFilter> = _periodFilter.asStateFlow()
 
     val filteredExpenses: StateFlow<List<Expense>> =
@@ -81,6 +81,17 @@ class ExpenseViewModel @Inject constructor(
         _selectedCategoryId.value = categoryId
     }
 
+    fun moveCategory(categoryId: Long, moveUp: Boolean) {
+        val current = categories.value
+        val index = current.indexOfFirst { it.id == categoryId }
+        val target = if (moveUp) index - 1 else index + 1
+        if (index == -1 || target !in current.indices) return
+        val reordered = current.toMutableList().apply {
+            add(target, removeAt(index))
+        }
+        viewModelScope.launch { repository.updateCategoryOrder(reordered.map { it.id }) }
+    }
+
     fun addCategory(name: String, budgetLimit: Double?) {
         viewModelScope.launch {
             val id = repository.addCategory(name, budgetLimit)
@@ -115,15 +126,15 @@ class ExpenseViewModel @Inject constructor(
         _periodFilter.value = current.copy(referenceMillis = shiftPeriod(current, delta))
     }
 
-    fun addExpense(categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
-        viewModelScope.launch { repository.addExpense(categoryId, amount, note, dateMillis, isCreditCard) }
+    fun addExpense(categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean, isExtra: Boolean) {
+        viewModelScope.launch { repository.addExpense(categoryId, amount, note, dateMillis, isCreditCard, isExtra) }
         // Keep the on-screen category filter in sync with what was just added, so the new expense
         // is visible in the list instead of hidden behind a different selected category.
         _selectedCategoryId.value = categoryId
     }
 
-    fun updateExpense(expense: Expense, categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean) {
-        viewModelScope.launch { repository.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard) }
+    fun updateExpense(expense: Expense, categoryId: Long, amount: Double, note: String, dateMillis: Long, isCreditCard: Boolean, isExtra: Boolean) {
+        viewModelScope.launch { repository.updateExpense(expense, categoryId, amount, note, dateMillis, isCreditCard, isExtra) }
     }
 
     fun deleteExpense(expense: Expense) {

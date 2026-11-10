@@ -21,7 +21,19 @@ class ExpenseRepository @Inject constructor(
     fun getAllCategories(): Flow<List<ExpenseCategory>> = expenseCategoryDao.getAllCategories()
 
     suspend fun addCategory(name: String, budgetLimit: Double? = null): Long =
-        expenseCategoryDao.insertCategory(ExpenseCategory(name = name, budgetLimit = budgetLimit))
+        expenseCategoryDao.insertCategory(
+            ExpenseCategory(
+                name = name,
+                budgetLimit = budgetLimit,
+                sortOrder = expenseCategoryDao.maxSortOrder() + 1,
+            )
+        )
+
+    suspend fun updateCategoryOrder(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, id ->
+            expenseCategoryDao.updateSortOrder(id, index)
+        }
+    }
 
     suspend fun updateCategory(category: ExpenseCategory, name: String, budgetLimit: Double?) {
         expenseCategoryDao.updateCategory(category.copy(name = name, budgetLimit = budgetLimit))
@@ -56,6 +68,10 @@ class ExpenseRepository @Inject constructor(
     fun getExpenseTotalForPeriod(startMillis: Long, endMillis: Long): Flow<Double> =
         expenseDao.getExpenseTotalForPeriod(startMillis, endMillis)
 
+    /** Extra spend for the period. Already included in the totals above, shown separately on Home. */
+    fun getExtraTotalForPeriod(startMillis: Long, endMillis: Long): Flow<Double> =
+        expenseDao.getExtraTotalForPeriod(startMillis, endMillis)
+
     /** All expenses in the period, across every category — used for the "any day" date lookup. */
     fun getExpensesForPeriod(startMillis: Long, endMillis: Long): Flow<List<Expense>> =
         expenseDao.getExpensesForPeriod(startMillis, endMillis)
@@ -78,6 +94,7 @@ class ExpenseRepository @Inject constructor(
         note: String,
         dateMillis: Long,
         isCreditCard: Boolean,
+        isExtra: Boolean,
     ) {
         expenseDao.insertExpense(
             Expense(
@@ -86,6 +103,7 @@ class ExpenseRepository @Inject constructor(
                 note = note,
                 dateMillis = dateMillis,
                 isCreditCard = isCreditCard,
+                isExtra = isExtra,
             )
         )
     }
@@ -97,6 +115,7 @@ class ExpenseRepository @Inject constructor(
         note: String,
         dateMillis: Long,
         isCreditCard: Boolean,
+        isExtra: Boolean,
     ) {
         expenseDao.updateExpense(
             expense.copy(
@@ -105,6 +124,7 @@ class ExpenseRepository @Inject constructor(
                 note = note,
                 dateMillis = dateMillis,
                 isCreditCard = isCreditCard,
+                isExtra = isExtra,
             )
         )
     }
